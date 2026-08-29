@@ -56,6 +56,7 @@ function openAssignPopup(x, y, row, col, ctx) {
     onAssign: (student) =>
       ctx.applyChange((s) => assignStudentAt(s, row, col, student)),
     onUnassign: () => ctx.applyChange((s) => unassignStudentAt(s, row, col)),
+    anchorEl: ctx.hostEl,
   });
 }
 
@@ -71,6 +72,7 @@ function openColorPopup(x, y, row, col, ctx) {
     current: cell?.color,
     onPick: (color) =>
       ctx.applyChange((s) => setDeskColorAt(s, row, col, color)),
+    anchorEl: ctx.hostEl,
   });
 }
 
@@ -117,7 +119,7 @@ function openCellContextMenu(x, y, row, col, ctx) {
     });
   }
 
-  openContextMenu(x, y, items);
+  openContextMenu(x, y, items, ctx.hostEl);
 }
 
 function handleEdgeClick(x, y, edgeKey, ctx) {
@@ -128,6 +130,7 @@ function handleEdgeClick(x, y, edgeKey, ctx) {
   }
   openBorderPicker(x, y, {
     onPick: (type) => ctx.applyChange((s) => setBorderAt(s, edgeKey, type)),
+    anchorEl: ctx.hostEl,
   });
 }
 
@@ -138,6 +141,7 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
   if (!edge) {
     openBorderPicker(x, y, {
       onPick: (type) => ctx.applyChange((s) => setBorderAt(s, edgeKey, type)),
+      anchorEl: ctx.hostEl,
     });
     return;
   }
@@ -157,13 +161,15 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
     icon: "trash",
     onSelect: () => ctx.applyChange((s) => clearBorderAt(s, edgeKey)),
   });
-  openContextMenu(x, y, items);
+  openContextMenu(x, y, items, ctx.hostEl);
 }
 
 /**
  * Wires up interactions on an already-rendered grid. `ctx.applyChange(fn)`
- * must apply `fn` to the current state, re-render and persist — supplied
- * by the ClassroomLayout instance (src/index.js).
+ * must apply `fn` to the current state, re-render and persist; `ctx.hostEl`
+ * is any element inside the module's own root, used to find an enclosing
+ * open <dialog> (if any) so popups get appended inside it instead of
+ * document.body — supplied by the ClassroomLayout instance (src/index.js).
  */
 export function attachInteractions(gridEl, ctx) {
   const onClick = (e) => {

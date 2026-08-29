@@ -16,15 +16,33 @@ export function closeFloating() {
   }
 }
 
-export function openFloating(x, y, className, build) {
+// A native <dialog> opened with showModal() is promoted to the browser's
+// "top layer", painted above all regular content regardless of z-index —
+// and everything outside it becomes inert (unclickable), including a panel
+// appended to document.body. So when the module is itself hosted inside an
+// open modal dialog (e.g. a host app's own dialog system), the floating
+// panel must be appended inside that dialog instead, with its position
+// computed relative to the dialog's box rather than the viewport (an
+// element with `transform` — which a centered dialog typically has —
+// becomes the containing block for its `position: fixed` descendants).
+function resolveHost(anchorEl) {
+  return anchorEl?.closest?.("dialog[open]") ?? document.body;
+}
+
+export function openFloating(x, y, className, build, anchorEl) {
   closeFloating();
+
+  const host = resolveHost(anchorEl);
+  const hostRect = host === document.body ? null : host.getBoundingClientRect();
+  let left = hostRect ? x - hostRect.left : x;
+  let top = hostRect ? y - hostRect.top : y;
 
   const panel = document.createElement("div");
   panel.className = `cll-floating ${className}`;
   panel.style.position = "fixed";
-  panel.style.left = `${x}px`;
-  panel.style.top = `${y}px`;
-  document.body.appendChild(panel);
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+  host.appendChild(panel);
   openEl = panel;
 
   const close = () => closeFloating();
@@ -32,10 +50,12 @@ export function openFloating(x, y, className, build) {
 
   const rect = panel.getBoundingClientRect();
   if (rect.right > window.innerWidth) {
-    panel.style.left = `${Math.max(0, x - rect.width)}px`;
+    left = Math.max(0, left - rect.width);
+    panel.style.left = `${left}px`;
   }
   if (rect.bottom > window.innerHeight) {
-    panel.style.top = `${Math.max(0, y - rect.height)}px`;
+    top = Math.max(0, top - rect.height);
+    panel.style.top = `${top}px`;
   }
 
   // Deferred by one tick: the click/contextmenu that just opened the panel

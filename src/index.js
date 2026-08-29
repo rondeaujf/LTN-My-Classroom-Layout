@@ -97,6 +97,7 @@ export class ClassroomLayout {
       getState: () => this.#state,
       applyChange: (fn) => this.applyChange(fn),
       options: this.#options,
+      hostEl: this.#root,
     });
   }
 
