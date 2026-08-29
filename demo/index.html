@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Démo — Ma Classe</title>
+    <link rel="stylesheet" href="../src/style.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #f6f7f8;
+        font-family: system-ui, sans-serif;
+      }
+      #app {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        font-size: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ma Classe — démo autonome (persistance localStorage)</h1>
+    <div id="app"></div>
+
+    <script type="module">
+      import { ClassroomLayout } from "../src/index.js";
+
+      const STORAGE_KEY = "ltn-classroom-layout-demo";
+
+      const students = [
+        {
+          id: "1",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          level: "CM1",
+          group: "A",
+        },
+        {
+          id: "2",
+          firstName: "Alan",
+          lastName: "Turing",
+          level: "CM1",
+          group: "B",
+        },
+        {
+          id: "3",
+          firstName: "Grace",
+          lastName: "Hopper",
+          level: "CM2",
+          group: "A",
+        },
+        {
+          id: "4",
+          firstName: "Katherine",
+          lastName: "Johnson",
+          level: "CM2",
+          group: "B",
+        },
+      ];
+
+      const colors = [
+        { label: "Bleu du site", value: "#2f6f9e" },
+        { label: "Maths", value: "#e07a5f" },
+        { label: "Français", value: "#81b29a" },
+        { label: "Sciences", value: "#f2cc8f" },
+      ];
+
+      const teacher = {
+        firstName: "Jean-François",
+        lastName: "Rondeau",
+        className: "CM1-CM2",
+        school: "École de la démo",
+        year: "2026-2027",
+      };
+
+      new ClassroomLayout(document.getElementById("app"), {
+        students,
+        colors,
+        teacher,
+        persistence: {
+          load: () => {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+          },
+          save: (state) => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          },
+        },
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,386 @@
+/* Module Ma Classe (ltn-classroom-layout) — styles autonomes, sans dépendance
+   à un site hôte. Préfixe de classe "cll-" pour éviter toute collision. */
+
+.cll-root {
+  --cll-accent: #2f6f9e;
+  --cll-desk-default: #eef1f4;
+  --cll-desk-stroke: #93a0ab;
+  --cll-figure: #55707f;
+  --cll-line: rgba(0, 0, 0, 0.14);
+  --cll-line-strong: rgba(0, 0, 0, 0.28);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.cll-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cll-cols), 1fr);
+  grid-template-rows: repeat(var(--cll-rows), 1fr);
+  width: 100%;
+  aspect-ratio: var(--cll-cols) / var(--cll-rows);
+  margin: 0 auto;
+  background: #fff;
+}
+
+.cll-cell {
+  position: relative;
+  border: 1px dashed var(--cll-line);
+  box-sizing: border-box;
+}
+
+.cll-cell--empty {
+  cursor: pointer;
+}
+
+.cll-cell--empty:hover {
+  background: rgba(47, 111, 158, 0.06);
+}
+
+.cll-desk {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 80%;
+  height: 80%;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.cll-desk-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.cll-desk-top {
+  fill: var(--cll-desk-color, var(--cll-desk-default));
+  stroke: var(--cll-desk-stroke);
+  stroke-width: 2;
+}
+
+.cll-desk-chair {
+  fill: #fff;
+  stroke: var(--cll-desk-stroke);
+  stroke-width: 2;
+}
+
+.cll-figure {
+  fill: var(--cll-figure);
+}
+
+.cll-desk-name {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 78%;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  color: #1c2b33;
+}
+
+.cll-desk-level {
+  position: absolute;
+  top: 6%;
+  left: 8%;
+  font-size: 10px;
+  font-weight: 600;
+  color: #55707f;
+  pointer-events: none;
+}
+
+/* Bordures (tableau / porte / fenêtre) : fines bandes cliquables posées sur
+   les traits de la grille, invisibles tant qu'aucun objet n'y est posé. */
+.cll-edge {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cll-edge--h {
+  height: 14px;
+  transform: translateY(-50%);
+}
+
+.cll-edge--v {
+  width: 14px;
+  transform: translateX(-50%);
+}
+
+.cll-edge:hover {
+  background: rgba(47, 111, 158, 0.18);
+}
+
+.cll-edge--set {
+  background: transparent;
+}
+
+.cll-border-icon {
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+}
+
+.cll-border-icon-path {
+  fill: none;
+  stroke: var(--cll-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- Panneaux flottants (menu, couleur, élève, bordure) ---- */
+.cll-floating {
+  z-index: 10060;
+  background: #fff;
+  border: 1px solid #d6dbe0;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  font-size: 13px;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: #1c2b33;
+}
+
+.cll-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 180px;
+}
+
+.cll-menu-item {
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cll-menu-item:hover {
+  background: rgba(47, 111, 158, 0.1);
+}
+
+.cll-menu-item.is-disabled {
+  color: #9aa5ac;
+  cursor: default;
+}
+
+.cll-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #e4e8eb;
+}
+
+.cll-colorpicker {
+  padding: 10px;
+  width: 220px;
+}
+
+.cll-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cll-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0;
+}
+
+.cll-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cll-color-alpha {
+  flex: 1;
+}
+
+.cll-color-apply,
+.cll-color-reset,
+.cll-student-remove {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  background: #f5f7f8;
+  cursor: pointer;
+}
+
+.cll-studentpicker {
+  padding: 10px;
+  width: 240px;
+}
+
+.cll-student-remove {
+  margin-bottom: 8px;
+  color: #a03030;
+}
+
+.cll-student-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.cll-student-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cll-student-list li {
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cll-student-list li:hover {
+  background: rgba(47, 111, 158, 0.1);
+}
+
+.cll-student-free-form {
+  display: flex;
+  gap: 6px;
+}
+
+.cll-student-free-form input {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+}
+
+.cll-student-free-form button {
+  padding: 6px 10px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  background: #f5f7f8;
+  cursor: pointer;
+}
+
+.cll-borderpicker {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+}
+
+.cll-borderpicker-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.cll-borderpicker-btn:hover {
+  border-color: #d6dbe0;
+  background: rgba(47, 111, 158, 0.1);
+}
+
+/* ---- Toolbar (sous-titre + impression/export) ---- */
+.cll-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cll-toolbar input[type="text"] {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+}
+
+.cll-toolbar button {
+  padding: 6px 12px;
+  border: 1px solid var(--cll-accent);
+  border-radius: 4px;
+  background: var(--cll-accent);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---- Impression ---- */
+.cll-print-sheet {
+  display: none;
+}
+
+@media print {
+  body.cll-printing > *:not(.cll-print-sheet) {
+    display: none !important;
+  }
+
+  .cll-print-sheet {
+    display: block;
+    width: 100%;
+  }
+
+  .cll-print-header {
+    margin-bottom: 14px;
+  }
+
+  .cll-print-teacher,
+  .cll-print-teacher-blank {
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .cll-print-teacher-blank {
+    color: #666;
+    font-weight: 400;
+  }
+
+  .cll-print-subtitle {
+    font-size: 12px;
+    color: #444;
+    margin-top: 2px;
+  }
+
+  .cll-print-grid-host .cll-edge:not(.cll-edge--set) {
+    display: none;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}

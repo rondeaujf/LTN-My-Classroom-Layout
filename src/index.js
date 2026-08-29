@@ -1,0 +1,149 @@
+import {
+  createEmptyState,
+  fitGridToContentWithRing,
+  deserializeState,
+  setSubtitle,
+} from "./model.js";
+import { renderGrid } from "./render.js";
+import { attachInteractions } from "./interactions.js";
+import { printLayout } from "./print.js";
+
+export class ClassroomLayout {
+  #container;
+  #root;
+  #subtitleInput;
+  #gridHost;
+  #state;
+  #options;
+  #detachInteractions;
+  #saveTimer;
+
+  /**
+   * @param {string|Element} container
+   * @param {object} [options]
+   * @param {{cols:number, rows:number}} [options.gridDefault] grille initiale (défaut 5x6) pour une configuration jamais enregistrée
+   * @param {Array<{id?, firstName?, lastName?, name?, level?, group?}>} [options.students]
+   * @param {Array<{label?, value}>|string[]} [options.colors] couleurs préférées (site/matières)
+   * @param {{firstName?, lastName?, className?, school?, year?}} [options.teacher]
+   * @param {{load(): any, save(state): void}} [options.persistence] adaptateur fourni par l'app hôte
+   * @param {(state) => void} [options.onChange]
+   */
+  constructor(container, options = {}) {
+    this.#container =
+      typeof container === "string"
+        ? document.querySelector(container)
+        : container;
+    if (!this.#container) {
+      throw new Error("ClassroomLayout: conteneur introuvable");
+    }
+    this.#options = options;
+    this.#state = createEmptyState(options.gridDefault);
+    this.#buildDom();
+    this.ready = this.#load();
+  }
+
+  #buildDom() {
+    this.#container.replaceChildren();
+    this.#root = document.createElement("div");
+    this.#root.className = "cll-root";
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "cll-toolbar";
+
+    this.#subtitleInput = document.createElement("input");
+    this.#subtitleInput.type = "text";
+    this.#subtitleInput.placeholder =
+      "Sous-titre (facultatif, affiché à l'impression)";
+    this.#subtitleInput.addEventListener("change", () => {
+      this.applyChange((s) => setSubtitle(s, this.#subtitleInput.value));
+    });
+
+    const printBtn = document.createElement("button");
+    printBtn.type = "button";
+    printBtn.textContent = "Imprimer / Export PDF";
+    printBtn.addEventListener("click", () => this.print());
+
+    toolbar.append(this.#subtitleInput, printBtn);
+
+    this.#gridHost = document.createElement("div");
+
+    this.#root.append(toolbar, this.#gridHost);
+    this.#container.appendChild(this.#root);
+  }
+
+  async #load() {
+    const loader = this.#options.persistence?.load;
+    if (loader) {
+      const saved = await loader();
+      if (saved) {
+        const loaded =
+          typeof saved === "string" ? deserializeState(saved) : saved;
+        this.#state = fitGridToContentWithRing(
+          loaded,
+          this.#options.gridDefault,
+        );
+      }
+    }
+    this.#subtitleInput.value = this.#state.subtitle;
+    this.#render();
+  }
+
+  #render() {
+    const gridEl = renderGrid(this.#gridHost, this.#state, {
+      nameFit: this.#options.nameFit,
+    });
+    this.#detachInteractions?.();
+    this.#detachInteractions = attachInteractions(gridEl, {
+      getState: () => this.#state,
+      applyChange: (fn) => this.applyChange(fn),
+      options: this.#options,
+    });
+  }
+
+  applyChange(fn) {
+    this.#state = fn(this.#state);
+    this.#subtitleInput.value = this.#state.subtitle;
+    this.#render();
+    this.#scheduleSave();
+    this.#options.onChange?.(this.getState());
+  }
+
+  #scheduleSave() {
+    if (!this.#options.persistence?.save) return;
+    clearTimeout(this.#saveTimer);
+    // Léger différé pour éviter une sauvegarde à chaque frappe/déplacement ;
+    // flushée immédiatement par destroy() pour ne rien perdre à la fermeture.
+    this.#saveTimer = setTimeout(() => this.#flushSave(), 300);
+  }
+
+  #flushSave() {
+    clearTimeout(this.#saveTimer);
+    this.#saveTimer = null;
+    this.#options.persistence?.save?.(this.getState());
+  }
+
+  getState() {
+    return this.#state;
+  }
+
+  setState(state) {
+    this.#state = typeof state === "string" ? deserializeState(state) : state;
+    this.#subtitleInput.value = this.#state.subtitle;
+    this.#render();
+  }
+
+  print() {
+    printLayout(this.#state, {
+      teacher: this.#options.teacher ?? this.#state.teacherOverride,
+      editableTeacherInputs: !this.#options.teacher,
+    });
+  }
+
+  destroy() {
+    this.#flushSave();
+    this.#detachInteractions?.();
+    this.#container.replaceChildren();
+  }
+}
+
+export * from "./model.js";
