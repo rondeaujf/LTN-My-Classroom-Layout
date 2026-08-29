@@ -265,6 +265,39 @@ describe("ClassroomLayout", () => {
     expect(document.querySelector(".cll-student-list li")).not.toBeNull();
   });
 
+  it("assigns a manually-entered name+level via the 'Ajouter un label' dialog", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": { type: "desk", rotation: 0, color: null, student: null },
+      },
+    }));
+
+    click(
+      container.querySelector('[data-row="0"][data-col="0"]'),
+      "contextmenu",
+    );
+    click(document.querySelector(".cll-menu-item")); // "Affecter un élève…"
+    click(document.querySelector(".cll-student-add-label"));
+
+    const dialog = document.querySelector(".cll-dialog");
+    expect(dialog).not.toBeNull();
+    const inputs = dialog.querySelectorAll("input");
+    inputs[0].value = "Léa";
+    inputs[1].value = "Martin";
+    inputs[2].value = "CE1";
+    click(document.querySelector(".cll-dialog__btn--primary"));
+
+    expect(layout.getState().cells["0_0"].student).toEqual({
+      firstName: "Léa",
+      lastName: "Martin",
+      level: "CE1",
+    });
+    expect(document.querySelector(".cll-dialog")).toBeNull();
+  });
+
   it("right-clicking an empty border offers the tableau/porte/fenetre/mur choice", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;

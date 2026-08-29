@@ -1,4 +1,5 @@
-import { renderGrid } from "./render.js";
+import { renderGrid, finalizeLayout } from "./render.js";
+import { fitGridToContentWithRing } from "./model.js";
 
 function teacherName(teacher) {
   if (!teacher) return "";
@@ -22,9 +23,20 @@ function metaLine(state, teacher) {
  * options.onPrint in src/index.js.
  */
 export function buildPrintSheet(
-  state,
+  rawState,
   { teacher, editableTeacherInputs, logoUrl } = {},
 ) {
+  // The editing grid can be much bigger than its actual content — every
+  // border/desk placed flush against its own current edge grows a fresh
+  // free ring to keep the room extensible (growGridToKeepFreeRing,
+  // src/model.js), which adds up over a session — printing/exporting that
+  // whole grid wastes most of the page on empty margin and shrinks the
+  // room itself far more than it needs to. Cropped with NO ring here
+  // (unlike the load-time fit, which keeps one so live editing can still
+  // extend the room) — a wall already sits flush against the content's own
+  // bounding box (fitGridToContentWithRing's edges loop includes it), so
+  // no extra margin is needed just to print/export it.
+  const state = fitGridToContentWithRing(rawState, rawState.grid, 0);
   const sheet = document.createElement("div");
   sheet.className = "cll-print-sheet";
 
@@ -96,6 +108,21 @@ export function printLayout(state, options = {}) {
 
   document.body.appendChild(sheet);
   document.body.classList.add("cll-printing");
+  // .cll-print-sheet is display:none outside of an actual browser print
+  // (see style.css) — a real layout box (offsetWidth etc., what
+  // finalizeLayout needs) only exists once @media print actually applies,
+  // which happens inside window.print()'s own rendering, too late for any
+  // JS on this side of that (blocking) call to react to. Given one,
+  // off-screen and synchronously undone before the next paint — and before
+  // window.print() below, which blocks and never lets a deferred fix run
+  // first either way.
+  sheet.style.position = "fixed";
+  sheet.style.left = "-99999px";
+  sheet.style.display = "block";
+  finalizeLayout(sheet, { nameFit: options.nameFit });
+  sheet.style.position = "";
+  sheet.style.left = "";
+  sheet.style.display = "";
 
   const cleanup = () => {
     sheet.remove();

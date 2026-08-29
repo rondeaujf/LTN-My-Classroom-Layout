@@ -108,7 +108,10 @@ function el(tag, { className, attrs, text } = {}) {
 // max-height) that matters once wrapped, not scrollWidth (bounded by
 // max-width, which just controls *where* it wraps) — but a name with no
 // wrap opportunity at all (one long word) can still overflow width too.
-function fitText(node, { max = 15, min = 7 } = {}) {
+// `max` is a fixed standard size, not a per-name ceiling to grow into: a
+// short name stays at `max`, never rendering larger than a neighboring
+// desk's long, shrunk one — only ever shrinks down from it, never up.
+function fitText(node, { max = 12, min = 7 } = {}) {
   let size = max;
   node.style.fontSize = `${size}px`;
   while (
@@ -121,6 +124,42 @@ function fitText(node, { max = 15, min = 7 } = {}) {
   }
 }
 
+const LEVEL_FONT_MIN = 7;
+
+function rectsOverlap(a, b) {
+  return !(
+    a.right <= b.left ||
+    a.left >= b.right ||
+    a.bottom <= b.top ||
+    a.top >= b.bottom
+  );
+}
+
+// The level badge keeps its own default size (.cll-desk-level, style.css)
+// whenever there's room — a small or rotated desk can otherwise leave too
+// little room for both it and the name at their own default sizes, so it
+// only ever shrinks (never grows), down to LEVEL_FONT_MIN, until the two no
+// longer overlap. getBoundingClientRect (not the local/percentage geometry
+// positionLevelBadge itself works in) because both badge and name
+// counter-rotate to stay upright (see buildCell) — their real screen boxes
+// are plain axis-aligned rects, whatever the desk's own rotation.
+// Re-positioned after each shrink step: positionLevelBadge anchors the
+// badge by its own current rendered size, which just changed.
+function avoidLevelNameOverlap(levelEl, nameEl, deskSize, rotation, stuck) {
+  let size = parseFloat(getComputedStyle(levelEl).fontSize);
+  while (
+    size > LEVEL_FONT_MIN &&
+    rectsOverlap(
+      levelEl.getBoundingClientRect(),
+      nameEl.getBoundingClientRect(),
+    )
+  ) {
+    size -= 1;
+    levelEl.style.fontSize = `${size}px`;
+    positionLevelBadge(levelEl, deskSize, rotation, stuck);
+  }
+}
+
 function studentLabel(student) {
   if (!student) return "";
   if (student.name) return student.name;
@@ -128,7 +167,7 @@ function studentLabel(student) {
   return parts.join(" ");
 }
 
-function buildCell(row, col, cell, options) {
+function buildCell(row, col, cell) {
   const cellEl = el("div", {
     className: "cll-cell",
     attrs: { "data-row": row, "data-col": col },
@@ -149,6 +188,12 @@ function buildCell(row, col, cell, options) {
     desk.style.transform = shift
       ? `${shift} rotate(${cell.rotation}deg)`
       : `rotate(${cell.rotation}deg)`;
+    // Read back by finalizeLayout below — it runs once the desk is
+    // guaranteed to be connected to a live document (unlike here, where a
+    // print sheet's grid is still detached, see buildPrintSheet/print.js),
+    // when the `cell` object itself is out of scope.
+    desk.dataset.rotation = cell.rotation;
+    if (cell.stuck) desk.dataset.stuck = "1";
     if (cell.color) desk.style.setProperty("--cll-desk-color", cell.color);
     desk.appendChild(
       buildDeskSvg({ occupied: !!cell.student, stuck: !!cell.stuck }),
@@ -164,16 +209,11 @@ function buildCell(row, col, cell, options) {
         const levelEl = el("div", { className: "cll-desk-level", text: level });
         levelEl.style.transform = `rotate(${-cell.rotation}deg)`;
         desk.appendChild(levelEl);
-        // Deferred: needs the badge's real rendered size (offsetWidth/
-        // Height), only available once it's actually laid out in the DOM.
-        requestAnimationFrame(() =>
-          positionLevelBadge(
-            levelEl,
-            desk.clientWidth,
-            cell.rotation,
-            !!cell.stuck,
-          ),
-        );
+        // Positioned by finalizeLayout below, not here: it needs the
+        // badge's real rendered size (offsetWidth/Height), only available
+        // once desk is connected to a live document — not yet the case
+        // even for the interactive view (grid is still a detached
+        // fragment at this point, see renderGrid).
       }
       const name = studentLabel(cell.student);
       if (name) {
@@ -183,9 +223,8 @@ function buildCell(row, col, cell, options) {
         nameEl.style.top = `${nameCenterY}%`;
         nameEl.style.transform = `translate(-50%, -50%) rotate(${-cell.rotation}deg)`;
         desk.appendChild(nameEl);
-        // Deferred measurement: the node must be in the DOM for a real
-        // clientWidth.
-        requestAnimationFrame(() => fitText(nameEl, options.nameFit));
+        // Shrunk to fit by finalizeLayout below — same reason as the level
+        // badge above (needs a real clientWidth/Height).
       }
     }
     cellEl.appendChild(desk);
@@ -244,7 +283,7 @@ export function renderGrid(container, state, options = {}) {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      grid.appendChild(buildCell(r, c, state.cells[cellKey(r, c)], options));
+      grid.appendChild(buildCell(r, c, state.cells[cellKey(r, c)]));
     }
   }
 
@@ -276,10 +315,43 @@ export function renderGrid(container, state, options = {}) {
   }
 
   container.appendChild(grid);
+  finalizeLayout(grid, options);
   return grid;
 }
 
-// plateauTopLeftLocal is exported for unit testing (see tests/render.test.js)
-// — the geometry they compute is otherwise only observable through actual
-// browser layout (levelEl.offsetWidth/Height), which jsdom doesn't provide.
-export { BORDER_TYPES, plateauTopLeftLocal, positionLevelBadge };
+/**
+ * Finishes desk-label positioning that needs each element's real rendered
+ * size (positionLevelBadge, fitText) — meaningless on a node not connected
+ * to a live document (offsetWidth/clientWidth read 0), so a no-op there.
+ * renderGrid above already calls this once, which is everything the
+ * interactive view (ClassroomLayout) needs: its container is attached to
+ * the page *before* renderGrid ever runs (see #buildDom/#render,
+ * src/index.js), so this first pass already measures correctly.
+ *
+ * A host app rendering its own print/PDF sheet (buildPrintSheet, not yet
+ * attached anywhere when renderGrid runs inside it — see src/print.js)
+ * must call this a second time itself, once it has attached that sheet to
+ * a live document at its own final size: printLayout() below does exactly
+ * that before window.print(), and any host app driving e.g. html2canvas
+ * off buildPrintSheet() directly needs to do the same before capturing
+ * (see README, "Printing your own way").
+ */
+export function finalizeLayout(root, options = {}) {
+  for (const desk of root.querySelectorAll(".cll-desk")) {
+    const rotation = Number(desk.dataset.rotation ?? 0);
+    const stuck = desk.dataset.stuck === "1";
+    const levelEl = desk.querySelector(".cll-desk-level");
+    if (levelEl) positionLevelBadge(levelEl, desk.clientWidth, rotation, stuck);
+    const nameEl = desk.querySelector(".cll-desk-name");
+    if (nameEl) fitText(nameEl, options.nameFit);
+    if (levelEl && nameEl) {
+      avoidLevelNameOverlap(levelEl, nameEl, desk.clientWidth, rotation, stuck);
+    }
+  }
+}
+
+// plateauTopLeftLocal/rectsOverlap are exported for unit testing (see
+// tests/render.test.js) — the geometry they compute is otherwise only
+// observable through actual browser layout (levelEl.offsetWidth/Height,
+// getBoundingClientRect), which jsdom doesn't provide.
+export { BORDER_TYPES, plateauTopLeftLocal, positionLevelBadge, rectsOverlap };

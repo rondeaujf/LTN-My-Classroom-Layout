@@ -67,7 +67,9 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   When a student's `level` is shown, its badge always sits in the desk's
   top-left corner _from the viewer's point of view_ — not whichever local
   corner "top-left" happens to rotate to — so it stays legible and
-  consistently placed at any rotation.
+  consistently placed at any rotation. It keeps its own default size unless
+  a small or rotated desk would otherwise make it overlap the name, in
+  which case it (only it, never the name) shrinks just enough to clear it.
 - **Click a cell border**: offers a choice (wall / board / door / window) if
   the border is empty; a second click on a border that already has an object
   removes it. Right-clicking a border offers the same choice when empty; on
@@ -84,9 +86,12 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   object (any type), the grid gets a `cll-grid--closed` class (see
   `isRoomEnclosed()` in `src/model.js`).
 - **Assign a student**: list of students without a desk yet (if
-  `options.students` is supplied), with search, or free-text entry of a
-  name. If `options.teacher` is documented, the teacher also appears in that
-  list and — unlike roster students — can be assigned to more than one desk
+  `options.students` is supplied), with search, or "Ajouter un label" — a
+  dialog (styled after the host site's own, not the picker's small anchored
+  panel) for a manual first/last name and level, for anyone not in the
+  roster. If `options.teacher` is documented, the teacher also appears in
+  that list and — unlike roster students — can be assigned to more than one
+  desk
   (the one exception to the "each student appears once" rule).
 - **Color**: preferred colors shown first (`options.colors`), then colors
   the user recently picked, then a free picker (hue + opacity).
@@ -98,8 +103,12 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   supplied), the subtitle, and (if `options.logoUrl` is supplied) the host
   app's logo centered at the bottom, mirroring the site's other PDF
   exports. The editing grid's dashed guide lines are not printed, only the
-  placed desks and border objects are. A host app can take over entirely
-  with `options.onPrint` (e.g. to render its own PDF from
+  placed desks and border objects are, and the grid itself is cropped to
+  content + one ring (see "Loading and the empty ring" below) — the live
+  editing grid can be much bigger than its actual content, and printing all
+  of it would waste most of the page on empty margin instead of a bigger
+  room plan; the editing state itself is untouched. A host app can take
+  over entirely with `options.onPrint` (e.g. to render its own PDF from
   `buildPrintSheet()` instead of the browser dialog).
 
 Every change is applied immediately to the state and triggers
@@ -119,17 +128,17 @@ ring — not pinned to 5×6.
 
 ### `new ClassroomLayout(container, options?)`
 
-| Option        | Type                                                         | Description                                                                                                                                                                                                |
-| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gridDefault` | `{cols, rows}`                                               | Initial grid when no configuration is loaded (default `{cols:5, rows:6}`).                                                                                                                                 |
-| `students`    | `Array<{id?, firstName?, lastName?, name?, level?, group?}>` | Optional list offered when assigning a student.                                                                                                                                                            |
-| `colors`      | `Array<string \| {label?, value}>`                           | Optional preferred colors (site colors, subject colors…).                                                                                                                                                  |
-| `teacher`     | `{firstName?, lastName?, className?, school?, year?}`        | Optional teacher info, shown in the print header. If absent, the print header fields are left blank for the teacher to fill in by hand, and the teacher entry above the roster doesn't appear.             |
-| `persistence` | `{load(), save(state)}`                                      | Persistence adapter supplied by the host app (`load` can be async; `save` receives the full state). Without it, nothing is loaded/saved — the host app manages `getState()`/`setState()` itself.           |
-| `onChange`    | `(state) => void`                                            | Optional callback invoked after every change.                                                                                                                                                              |
-| `onPrint`     | `(state, {teacher, logoUrl}) => void`                        | Optional override for `layout.print()` — if supplied, called instead of opening the browser's print dialog (e.g. to render a PDF from `buildPrintSheet()` and show it however the host app displays PDFs). |
-| `logoUrl`     | `string`                                                     | Optional host-app logo URL, shown centered at the bottom of the print/PDF sheet (mirrors the site's other PDF exports).                                                                                    |
-| `nameFit`     | `{max?, min?}`                                               | Bounds (px) for the automatic size-down of the student name shown on the desk.                                                                                                                             |
+| Option        | Type                                                         | Description                                                                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gridDefault` | `{cols, rows}`                                               | Initial grid when no configuration is loaded (default `{cols:5, rows:6}`).                                                                                                                                                                                                                  |
+| `students`    | `Array<{id?, firstName?, lastName?, name?, level?, group?}>` | Optional list offered when assigning a student.                                                                                                                                                                                                                                             |
+| `colors`      | `Array<string \| {label?, value}>`                           | Optional preferred colors (site colors, subject colors…).                                                                                                                                                                                                                                   |
+| `teacher`     | `{firstName?, lastName?, className?, school?, year?}`        | Optional teacher info, shown in the print header. If absent, the print header fields are left blank for the teacher to fill in by hand, and the teacher entry above the roster doesn't appear.                                                                                              |
+| `persistence` | `{load(), save(state)}`                                      | Persistence adapter supplied by the host app (`load` can be async; `save` receives the full state). Without it, nothing is loaded/saved — the host app manages `getState()`/`setState()` itself.                                                                                            |
+| `onChange`    | `(state) => void`                                            | Optional callback invoked after every change.                                                                                                                                                                                                                                               |
+| `onPrint`     | `(state, {teacher, logoUrl}) => void`                        | Optional override for `layout.print()` — if supplied, called instead of opening the browser's print dialog (e.g. to render a PDF from `buildPrintSheet()` and show it however the host app displays PDFs).                                                                                  |
+| `logoUrl`     | `string`                                                     | Optional host-app logo URL, shown centered at the bottom of the print/PDF sheet (mirrors the site's other PDF exports).                                                                                                                                                                     |
+| `nameFit`     | `{max?, min?}`                                               | Bounds (px) for the automatic size-down of the student name shown on the desk. `max` (default `12`) is a fixed standard size, not a per-name ceiling — a short name never renders larger than it, only ever shrinking below it (down to `min`, default `7`) when it wouldn't otherwise fit. |
 
 ### Methods
 
@@ -148,6 +157,16 @@ Pure model functions are also exported (`toggleDeskAt`, `rotateDeskAt`,
 detached DOM node used by `options.onPrint` (see `src/print.js`) — fully
 styled outside of an actual browser print too (e.g. for `html2canvas`),
 not just under `@media print`.
+
+Desk name/level positioning needs each element's real rendered size
+(offsetWidth/clientWidth), which only exists once it's connected to a live
+document — `buildPrintSheet()`'s sheet is still detached when it's built, so
+a host app driving its own capture off it (e.g. `html2canvas`, instead of
+`printLayout()`/`options.onPrint`'s default) must call
+`finalizeLayout(sheet)` itself, once the sheet is attached to the document
+at its real final size, before capturing — otherwise names/badges are left
+at their default, unpositioned spot. `printLayout()` already does this
+internally.
 
 ## State JSON schema
 

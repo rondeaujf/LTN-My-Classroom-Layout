@@ -1,4 +1,5 @@
 import { openFloating } from "./popup.js";
+import { openLabelDialog } from "./labelDialog.js";
 import { buildMenuIcon } from "./svg.js";
 
 function studentLabel(s) {
@@ -81,23 +82,22 @@ export function openStudentPicker(
         panel.append(search, list);
       }
 
-      const form = document.createElement("form");
-      form.className = "cll-student-free-form";
-      const freeInput = document.createElement("input");
-      freeInput.type = "text";
-      freeInput.placeholder = "Ou saisir un nom libre…";
-      const submitBtn = document.createElement("button");
-      submitBtn.type = "submit";
-      submitBtn.textContent = "OK";
-      form.append(freeInput, submitBtn);
-      form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const name = freeInput.value.trim();
-        if (!name) return;
+      // Not in the roster (or no options.students supplied at all): a
+      // free-text name, and — unlike a roster pick — an optional level too
+      // (openLabelDialog, its own dedicated dialog, see labelDialog.js).
+      const addLabelBtn = document.createElement("button");
+      addLabelBtn.type = "button";
+      addLabelBtn.className = "cll-student-add-label";
+      addLabelBtn.appendChild(buildMenuIcon("plus"));
+      addLabelBtn.appendChild(document.createTextNode("Ajouter un label"));
+      addLabelBtn.addEventListener("click", () => {
         close();
-        onAssign({ name });
+        openLabelDialog({
+          onSubmit: (student) => onAssign(student),
+          anchorEl,
+        });
       });
-      panel.appendChild(form);
+      panel.appendChild(addLabelBtn);
     },
     anchorEl,
   );
