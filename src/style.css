@@ -1,0 +1,463 @@
+/* Ma Classe module (ltn-classroom-layout) — self-contained styles, no
+   dependency on a host site. Class prefix "cll-" to avoid collisions. */
+
+.cll-root {
+  --cll-accent: #2f6f9e;
+  --cll-desk-default: #eef1f4;
+  --cll-desk-stroke: #93a0ab;
+  --cll-figure: #55707f;
+  --cll-line: rgba(0, 0, 0, 0.14);
+  --cll-line-strong: rgba(0, 0, 0, 0.28);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.cll-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cll-cols), 1fr);
+  grid-template-rows: repeat(var(--cll-rows), 1fr);
+  width: 100%;
+  aspect-ratio: var(--cll-cols) / var(--cll-rows);
+  margin: 0 auto;
+  background: #fff;
+}
+
+.cll-cell {
+  position: relative;
+  border: 1px dashed var(--cll-line);
+  box-sizing: border-box;
+}
+
+.cll-cell--empty {
+  cursor: pointer;
+}
+
+.cll-cell--empty:hover {
+  background: rgba(47, 111, 158, 0.06);
+}
+
+.cll-desk {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 80%;
+  height: 80%;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.cll-desk-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.cll-desk-top {
+  fill: var(--cll-desk-color, var(--cll-desk-default));
+  stroke: var(--cll-desk-stroke);
+  stroke-width: 2;
+}
+
+.cll-desk-chair {
+  fill: #fff;
+  stroke: var(--cll-desk-stroke);
+  stroke-width: 2;
+}
+
+.cll-figure {
+  fill: var(--cll-figure);
+}
+
+.cll-desk-name {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 78%;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  color: #1c2b33;
+}
+
+.cll-desk-level {
+  position: absolute;
+  top: 6%;
+  left: 8%;
+  font-size: 10px;
+  font-weight: 600;
+  color: #55707f;
+  pointer-events: none;
+}
+
+/* Borders (tableau / porte / fenetre): clickable strips laid over the grid
+   lines, spilling ~5% into each neighboring cell (see EDGE_OVERFLOW in
+   render.js) so a placed object reads as a fixture spanning the wall, not a
+   small marker on the grid line. Invisible until an object is placed. */
+.cll-edge {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cll-edge--h {
+  height: 40px;
+  transform: translateY(-50%);
+}
+
+.cll-edge--v {
+  width: 40px;
+  transform: translateX(-50%);
+}
+
+.cll-edge:hover {
+  background: rgba(47, 111, 158, 0.18);
+}
+
+.cll-edge--set {
+  background: transparent;
+}
+
+/* Fills the whole (already full-width) edge zone — plain line art directly
+   on the wall, no icon badge or color fill. */
+.cll-border-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The board itself: just a solid line, seen edge-on from above. */
+.cll-border-icon-board {
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.cll-border-icon-path {
+  fill: none;
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cll-border-icon-leaf {
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.cll-border-icon-arc {
+  fill: none;
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.cll-border-icon-hinge {
+  fill: var(--cll-accent, #2f6f9e);
+}
+
+/* ---- Floating panels (menu, color, student, border) ---- */
+.cll-floating {
+  z-index: 10060;
+  background: #fff;
+  border: 1px solid #d6dbe0;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  font-size: 13px;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: #1c2b33;
+}
+
+.cll-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 180px;
+}
+
+.cll-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cll-menu-item:hover {
+  background: rgba(47, 111, 158, 0.1);
+}
+
+.cll-menu-item.is-disabled {
+  color: #9aa5ac;
+  cursor: default;
+}
+
+.cll-menu-icon {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  stroke: var(--cll-accent, #2f6f9e);
+  fill: var(--cll-accent, #2f6f9e);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.is-disabled .cll-menu-icon {
+  stroke: #9aa5ac;
+  fill: #9aa5ac;
+}
+
+.cll-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #e4e8eb;
+}
+
+.cll-colorpicker {
+  padding: 10px;
+  width: 220px;
+}
+
+.cll-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cll-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0;
+}
+
+.cll-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cll-color-alpha {
+  flex: 1;
+}
+
+.cll-color-apply,
+.cll-color-reset,
+.cll-student-remove {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  background: #f5f7f8;
+  cursor: pointer;
+}
+
+.cll-studentpicker {
+  padding: 10px;
+  width: 240px;
+}
+
+.cll-student-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #a03030;
+}
+
+.cll-student-remove .cll-menu-icon {
+  stroke: #a03030;
+  fill: #a03030;
+}
+
+.cll-student-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.cll-student-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cll-student-list li {
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cll-student-list li:hover {
+  background: rgba(47, 111, 158, 0.1);
+}
+
+.cll-student-free-form {
+  display: flex;
+  gap: 6px;
+}
+
+.cll-student-free-form input {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+}
+
+.cll-student-free-form button {
+  padding: 6px 10px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  background: #f5f7f8;
+  cursor: pointer;
+}
+
+.cll-borderpicker {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+}
+
+.cll-borderpicker-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.cll-borderpicker-btn:hover {
+  border-color: #d6dbe0;
+  background: rgba(47, 111, 158, 0.1);
+}
+
+/* Fixed preview size: unlike a placed border object (which fills its full
+   edge zone, see .cll-border-icon above), the icon here just previews the
+   shape next to its label, so it needs an explicit, modest size instead of
+   100%/100% of an otherwise unconstrained button. */
+.cll-borderpicker-btn .cll-border-icon {
+  width: 64px;
+  height: 24px;
+}
+
+/* ---- Toolbar (subtitle + print/export) ---- */
+.cll-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cll-toolbar input[type="text"] {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+}
+
+.cll-toolbar button {
+  padding: 6px 12px;
+  border: 1px solid var(--cll-accent, #2f6f9e);
+  border-radius: 4px;
+  background: var(--cll-accent, #2f6f9e);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---- Print ---- */
+.cll-print-sheet {
+  display: none;
+}
+
+@media print {
+  body.cll-printing > *:not(.cll-print-sheet) {
+    display: none !important;
+  }
+
+  .cll-print-sheet {
+    display: block;
+    width: 100%;
+    color: #2c3e50;
+  }
+
+  /* Mirrors the "student list" PDF export banner already used elsewhere in
+     the host app: bold school/teacher row, dark rule, gray meta line. */
+  .cll-print-header {
+    border-bottom: 2px solid #2c3e50;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+  }
+
+  .cll-print-banner-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .cll-print-school,
+  .cll-print-teacher {
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .cll-print-meta {
+    font-size: 11px;
+    color: #566573;
+    margin-top: 2px;
+  }
+
+  /* The dashed editing grid is a canvas aid, not part of the printed room
+     plan — only placed desks/objects should show up on paper. */
+  .cll-print-grid-host .cll-cell {
+    border: none;
+  }
+
+  .cll-print-grid-host .cll-edge:not(.cll-edge--set) {
+    display: none;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}

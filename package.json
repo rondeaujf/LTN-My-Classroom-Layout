@@ -1,0 +1,41 @@
+{
+  "name": "ltn-classroom-layout",
+  "version": "0.1.0",
+  "description": "Standalone vanilla JS module for an interactive classroom seating chart: desk grid, rotation/color, student assignment, border objects (board/door/window), print export.",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./style.css": "./src/style.css"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "keywords": [
+    "classroom",
+    "seating-chart",
+    "plan-de-classe",
+    "education"
+  ],
+  "author": "Jean-François Rondeau",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.5",
+    "vitest": "^4.1.10"
+  }
+}
