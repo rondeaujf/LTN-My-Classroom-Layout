@@ -72,12 +72,15 @@ function buildBorderZone(edgeKey, orientation, edge, geometry) {
   });
   Object.assign(zone.style, geometry);
   if (edge) {
-    const icon = buildBorderIcon(edge.type);
-    if (edge.rotation) icon.style.transform = `rotate(${edge.rotation}deg)`;
-    zone.appendChild(icon);
+    zone.appendChild(buildBorderIcon(edge.type, orientation, edge.rotation));
   }
   return zone;
 }
+
+// A border object claims the full width of the cell it's attached to, plus
+// a spill of OVERFLOW into each of the two neighboring cells — it reads as
+// an actual fixture on the wall, not a small marker on the grid line.
+const EDGE_OVERFLOW = 0.05;
 
 /**
  * Fully (re)builds the grid inside `container` from `state`. Rewrites the
@@ -104,8 +107,8 @@ export function renderGrid(container, state, options = {}) {
       grid.appendChild(
         buildBorderZone(key, "h", state.edges[key], {
           top: `${(line / rows) * 100}%`,
-          left: `${(col / cols) * 100}%`,
-          width: `${(1 / cols) * 100}%`,
+          left: `${((col - EDGE_OVERFLOW) / cols) * 100}%`,
+          width: `${((1 + 2 * EDGE_OVERFLOW) / cols) * 100}%`,
         }),
       );
     }
@@ -115,9 +118,9 @@ export function renderGrid(container, state, options = {}) {
       const key = vEdgeKey(row, line);
       grid.appendChild(
         buildBorderZone(key, "v", state.edges[key], {
-          top: `${(row / rows) * 100}%`,
+          top: `${((row - EDGE_OVERFLOW) / rows) * 100}%`,
           left: `${(line / cols) * 100}%`,
-          height: `${(1 / rows) * 100}%`,
+          height: `${((1 + 2 * EDGE_OVERFLOW) / rows) * 100}%`,
         }),
       );
     }

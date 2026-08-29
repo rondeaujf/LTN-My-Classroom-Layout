@@ -99,8 +99,9 @@
 }
 
 /* Borders (tableau / porte / fenetre): clickable strips laid over the grid
-   lines, invisible until an object is placed there — see .cll-edge--set for
-   the badge shown once one is. */
+   lines, spilling ~5% into each neighboring cell (see EDGE_OVERFLOW in
+   render.js) so a placed object reads as a fixture spanning the wall, not a
+   small marker on the grid line. Invisible until an object is placed. */
 .cll-edge {
   position: absolute;
   z-index: 2;
@@ -111,12 +112,12 @@
 }
 
 .cll-edge--h {
-  height: 26px;
+  height: 40px;
   transform: translateY(-50%);
 }
 
 .cll-edge--v {
-  width: 26px;
+  width: 40px;
   transform: translateX(-50%);
 }
 
@@ -128,44 +129,40 @@
   background: transparent;
 }
 
-/* White badge behind a placed icon so it reads clearly against the dashed
-   grid lines and neighboring desks (large icon requested for visibility). */
+/* Fills the whole (already full-width) edge zone — plain line art directly
+   on the wall, no icon badge or color fill. */
 .cll-border-icon {
-  width: 32px;
-  height: 32px;
-  overflow: visible;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 2px #fff,
-    0 1px 4px rgba(0, 0, 0, 0.22);
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The board itself: just a solid line, seen edge-on from above. */
+.cll-border-icon-board {
+  stroke: var(--cll-accent);
+  stroke-width: 5;
+  stroke-linecap: round;
 }
 
 .cll-border-icon-path {
   fill: none;
   stroke: var(--cll-accent);
-  stroke-width: 2.2;
+  stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.cll-border-icon-fill {
-  fill: #eaf3f9;
-  stroke: var(--cll-accent);
-  stroke-width: 2;
-}
-
 .cll-border-icon-leaf {
   stroke: var(--cll-accent);
-  stroke-width: 2.4;
+  stroke-width: 3;
   stroke-linecap: round;
 }
 
 .cll-border-icon-arc {
   fill: none;
   stroke: var(--cll-accent);
-  stroke-width: 1.6;
-  stroke-dasharray: 3 2.5;
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
 }
 
 .cll-border-icon-hinge {

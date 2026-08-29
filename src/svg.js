@@ -50,120 +50,117 @@ export function buildDeskSvg({ occupied }) {
   return svg;
 }
 
-// Board (whiteboard on an easel), viewed face-on.
-function buildTableauIcon(g) {
+// Border objects (tableau/porte/fenetre) are drawn on a wide "lane" — the
+// full width of the border segment they occupy (see render.js: the edge
+// zone itself is widened to spill ~5% into each neighboring cell) — always
+// authored in this local, horizontal-lane coordinate system:
+//   x: 0 (left) .. LANE_LEN (right), along the wall
+//   y: 0 (top)  .. LANE_THICK (bottom), across the wall's thickness
+// `localPoint` maps a local (x, y) to actual SVG coordinates: unchanged for
+// a horizontal border, transposed (x<->y, a reflection) for a vertical one
+// — so the same authored coordinates work for both orientations without
+// needing a runtime CSS rotation (which would fight the SVG's own
+// viewBox-fitting). `mirror` (only used by the door) additionally flips the
+// lane along its length, for "change opening side".
+const LANE_LEN = 220;
+const LANE_THICK = 40;
+
+function localPoint(orientation, mirror, x, y) {
+  const lx = mirror ? LANE_LEN - x : x;
+  return orientation === "v" ? [y, lx] : [lx, y];
+}
+
+function laneLine(orientation, mirror, x1, y1, x2, y2, className) {
+  const [ax, ay] = localPoint(orientation, mirror, x1, y1);
+  const [bx, by] = localPoint(orientation, mirror, x2, y2);
+  return el("line", { x1: ax, y1: ay, x2: bx, y2: by, class: className });
+}
+
+function laneCircle(orientation, mirror, cx, cy, r, className) {
+  const [x, y] = localPoint(orientation, mirror, cx, cy);
+  return el("circle", { cx: x, cy: y, r, class: className });
+}
+
+// A quarter-circle-ish arc between two local points, radius r. Both a
+// mirror and a 'v' transpose are reflections, so each independently flips
+// which way the arc bulges — sweep is toggled once per reflection to keep
+// it curving the correct way in every combination.
+function laneArc(orientation, mirror, x1, y1, x2, y2, r, className) {
+  const [sx, sy] = localPoint(orientation, mirror, x1, y1);
+  const [ex, ey] = localPoint(orientation, mirror, x2, y2);
+  const flips = (mirror ? 1 : 0) + (orientation === "v" ? 1 : 0);
+  const sweep = flips % 2;
+  return el("path", {
+    d: `M${sx} ${sy} A${r} ${r} 0 0 ${sweep} ${ex} ${ey}`,
+    class: className,
+  });
+}
+
+function laneRectOutline(orientation, x, y, w, h, className) {
+  const isV = orientation === "v";
+  return el("rect", {
+    x: isV ? y : x,
+    y: isV ? x : y,
+    width: isV ? h : w,
+    height: isV ? w : h,
+    class: className,
+  });
+}
+
+// Board: just a solid line (seen edge-on, from above) with a small outlined
+// rectangle for the chalk tray — per spec, no color fill, kept minimal.
+function buildTableauIcon(g, orientation) {
   g.appendChild(
-    el("rect", {
-      x: 4,
-      y: 6,
-      width: 24,
-      height: 15,
-      rx: 1.5,
-      class: "cll-border-icon-fill",
-    }),
+    laneLine(orientation, false, 6, 20, 214, 20, "cll-border-icon-board"),
   );
   g.appendChild(
-    el("line", { x1: 9, y1: 21, x2: 6, y2: 27, class: "cll-border-icon-path" }),
-  );
-  g.appendChild(
-    el("line", {
-      x1: 23,
-      y1: 21,
-      x2: 26,
-      y2: 27,
-      class: "cll-border-icon-path",
-    }),
-  );
-  g.appendChild(
-    el("line", {
-      x1: 6,
-      y1: 27,
-      x2: 26,
-      y2: 27,
-      class: "cll-border-icon-path",
-    }),
+    laneRectOutline(orientation, 98, 22, 24, 7, "cll-border-icon-path"),
   );
 }
 
-// Window with a 4-pane cross divider.
-function buildFenetreIcon(g) {
+// Window: a set of parallel lines across the wall gap — the standard
+// top-down "glazed opening" pictogram.
+function buildFenetreIcon(g, orientation) {
+  [8, 20, 32].forEach((y) => {
+    g.appendChild(
+      laneLine(orientation, false, 6, y, 214, y, "cll-border-icon-path"),
+    );
+  });
+}
+
+// Door ajar: a threshold line spanning the opening, a hinge dot near one
+// end, the leaf swung open at ~55°, and a dashed arc tracing its sweep.
+// `rotation` (0/180, see rotateBorderAt in src/model.js) mirrors the whole
+// symbol along the wall to flip which side it opens from.
+function buildPorteIcon(g, orientation, rotation) {
+  const mirror = rotation === 180;
   g.appendChild(
-    el("rect", {
-      x: 4,
-      y: 4,
-      width: 24,
-      height: 24,
-      rx: 1,
-      class: "cll-border-icon-fill",
-    }),
+    laneLine(orientation, false, 6, 34, 214, 34, "cll-border-icon-path"),
   );
   g.appendChild(
-    el("line", {
-      x1: 16,
-      y1: 4,
-      x2: 16,
-      y2: 28,
-      class: "cll-border-icon-path",
-    }),
+    laneArc(orientation, mirror, 50, 34, 37, 9, 30, "cll-border-icon-arc"),
   );
   g.appendChild(
-    el("line", {
-      x1: 4,
-      y1: 16,
-      x2: 28,
-      y2: 16,
-      class: "cll-border-icon-path",
-    }),
+    laneLine(orientation, mirror, 20, 34, 37, 9, "cll-border-icon-leaf"),
+  );
+  g.appendChild(
+    laneCircle(orientation, mirror, 20, 34, 2.2, "cll-border-icon-hinge"),
   );
 }
 
-// Door ajar (standard architectural swing symbol): a baseline for the wall
-// opening, a hinge dot at one end, the leaf swung open at ~55°, and a
-// dashed arc tracing its sweep from the closed (flat) position to the open
-// one. Rotation (0/180, cf. rotateBorderAt in src/model.js) flips which
-// side it opens from.
-function buildPorteIcon(g) {
-  g.appendChild(
-    el("line", {
-      x1: 4,
-      y1: 26,
-      x2: 28,
-      y2: 26,
-      class: "cll-border-icon-path",
-    }),
-  );
-  g.appendChild(
-    el("path", {
-      d: "M26 26 A20 20 0 0 0 17.5 9.6",
-      class: "cll-border-icon-arc",
-    }),
-  );
-  g.appendChild(
-    el("line", {
-      x1: 6,
-      y1: 26,
-      x2: 17.5,
-      y2: 9.6,
-      class: "cll-border-icon-leaf",
-    }),
-  );
-  g.appendChild(
-    el("circle", { cx: 6, cy: 26, r: 1.8, class: "cll-border-icon-hinge" }),
-  );
-}
-
-const ICON_BUILDERS = {
-  tableau: buildTableauIcon,
-  porte: buildPorteIcon,
-  fenetre: buildFenetreIcon,
-};
-
-export function buildBorderIcon(type) {
+export function buildBorderIcon(type, orientation = "h", rotation = 0) {
+  const viewBox =
+    orientation === "v"
+      ? `0 0 ${LANE_THICK} ${LANE_LEN}`
+      : `0 0 ${LANE_LEN} ${LANE_THICK}`;
   const svg = el("svg", {
-    viewBox: "0 0 32 32",
+    viewBox,
+    preserveAspectRatio: "none",
     class: `cll-border-icon cll-border-icon--${type}`,
     "aria-hidden": "true",
   });
-  ICON_BUILDERS[type](svg);
+  if (type === "tableau") buildTableauIcon(svg, orientation);
+  else if (type === "fenetre") buildFenetreIcon(svg, orientation);
+  else buildPorteIcon(svg, orientation, rotation);
   return svg;
 }
