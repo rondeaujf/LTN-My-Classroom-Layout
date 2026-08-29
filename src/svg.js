@@ -6,22 +6,38 @@ function el(tag, attrs) {
   return node;
 }
 
+// How far the whole desk (top + chair + figure) sits from the cell's own
+// top edge by default — also how far it shifts up when "stuck" to it.
+// Exported so render.js can shift the level badge by the same amount, in
+// the same local (pre-rotation) direction, when the desk is stuck.
+export const DESK_TOP_MARGIN = 8;
+
 // Desk seen from above, chair against the "south" edge (before rotation).
 // Desk rotation spins this whole SVG via CSS; the student label is rendered
 // separately on top so it stays readable at any rotation (see render.js).
-export function buildDeskSvg({ occupied }) {
+// `stuck` pushes the whole desk flush against its own "head" edge (see
+// toggleDeskStuckAt in src/model.js) instead of leaving the usual margin —
+// rotation (a CSS transform on the container, not this drawing) then takes
+// that local "up" edge to whichever screen edge the desk currently faces.
+export function buildDeskSvg({ occupied, stuck }) {
   const svg = el("svg", {
     viewBox: "0 0 100 100",
     class: "cll-desk-svg",
     "aria-hidden": "true",
   });
+  const dy = stuck ? -DESK_TOP_MARGIN : 0;
 
+  // Full width (x:0, width:100), edge-to-edge with the cell: desks placed
+  // side by side butt up against each other with no gap, to read as one
+  // large table. Width:height is exactly 2:1 (100:50) — a desk rotated 90°
+  // then keeps that same clean half-cell proportion, so alignment (edge to
+  // edge, or the half-cell shift, see setDeskHalfShiftAt) still lines up.
   svg.appendChild(
     el("rect", {
-      x: 8,
-      y: 8,
-      width: 84,
-      height: 58,
+      x: 0,
+      y: DESK_TOP_MARGIN + dy,
+      width: 100,
+      height: 50,
       rx: 5,
       class: "cll-desk-top",
     }),
@@ -30,7 +46,7 @@ export function buildDeskSvg({ occupied }) {
   svg.appendChild(
     el("rect", {
       x: 33,
-      y: 68,
+      y: 68 + dy,
       width: 34,
       height: 22,
       rx: 8,
@@ -40,10 +56,16 @@ export function buildDeskSvg({ occupied }) {
 
   if (occupied) {
     svg.appendChild(
-      el("ellipse", { cx: 50, cy: 84, rx: 15, ry: 10, class: "cll-figure" }),
+      el("ellipse", {
+        cx: 50,
+        cy: 84 + dy,
+        rx: 15,
+        ry: 10,
+        class: "cll-figure",
+      }),
     );
     svg.appendChild(
-      el("circle", { cx: 50, cy: 74, r: 9, class: "cll-figure" }),
+      el("circle", { cx: 50, cy: 74 + dy, r: 9, class: "cll-figure" }),
     );
   }
 
@@ -60,35 +82,48 @@ export function buildDeskSvg({ occupied }) {
 // a horizontal border, transposed (x<->y, a reflection) for a vertical one
 // — so the same authored coordinates work for both orientations without
 // needing a runtime CSS rotation (which would fight the SVG's own
-// viewBox-fitting). `mirror` (only used by the door) additionally flips the
-// lane along its length, for "change opening side".
+// viewBox-fitting). `mirrorX` (door: "change opening side") flips the lane
+// along its length; `mirrorY` (tableau: "retourner") flips it across its
+// thickness, i.e. which face of the wall the detail sits on.
 const LANE_LEN = 220;
 const LANE_THICK = 40;
+// Dead center of the lane: the actual cell border the wall line must sit on
+// so every border type (and the door's own threshold) lines up with it.
+const WALL_Y = LANE_THICK / 2;
 
-function localPoint(orientation, mirror, x, y) {
-  const lx = mirror ? LANE_LEN - x : x;
-  return orientation === "v" ? [y, lx] : [lx, y];
+function localPoint(
+  orientation,
+  { mirrorX = false, mirrorY = false } = {},
+  x,
+  y,
+) {
+  const lx = mirrorX ? LANE_LEN - x : x;
+  const ly = mirrorY ? LANE_THICK - y : y;
+  return orientation === "v" ? [ly, lx] : [lx, ly];
 }
 
-function laneLine(orientation, mirror, x1, y1, x2, y2, className) {
-  const [ax, ay] = localPoint(orientation, mirror, x1, y1);
-  const [bx, by] = localPoint(orientation, mirror, x2, y2);
+function laneLine(orientation, xform, x1, y1, x2, y2, className) {
+  const [ax, ay] = localPoint(orientation, xform, x1, y1);
+  const [bx, by] = localPoint(orientation, xform, x2, y2);
   return el("line", { x1: ax, y1: ay, x2: bx, y2: by, class: className });
 }
 
-function laneCircle(orientation, mirror, cx, cy, r, className) {
-  const [x, y] = localPoint(orientation, mirror, cx, cy);
+function laneCircle(orientation, xform, cx, cy, r, className) {
+  const [x, y] = localPoint(orientation, xform, cx, cy);
   return el("circle", { cx: x, cy: y, r, class: className });
 }
 
-// A quarter-circle-ish arc between two local points, radius r. Both a
-// mirror and a 'v' transpose are reflections, so each independently flips
+// A quarter-circle-ish arc between two local points, radius r. Each
+// reflection (mirrorX, mirrorY, or the 'v' transpose) independently flips
 // which way the arc bulges — sweep is toggled once per reflection to keep
 // it curving the correct way in every combination.
-function laneArc(orientation, mirror, x1, y1, x2, y2, r, className) {
-  const [sx, sy] = localPoint(orientation, mirror, x1, y1);
-  const [ex, ey] = localPoint(orientation, mirror, x2, y2);
-  const flips = (mirror ? 1 : 0) + (orientation === "v" ? 1 : 0);
+function laneArc(orientation, xform, x1, y1, x2, y2, r, className) {
+  const [sx, sy] = localPoint(orientation, xform, x1, y1);
+  const [ex, ey] = localPoint(orientation, xform, x2, y2);
+  const flips =
+    (xform.mirrorX ? 1 : 0) +
+    (xform.mirrorY ? 1 : 0) +
+    (orientation === "v" ? 1 : 0);
   const sweep = flips % 2;
   return el("path", {
     d: `M${sx} ${sy} A${r} ${r} 0 0 ${sweep} ${ex} ${ey}`,
@@ -96,60 +131,113 @@ function laneArc(orientation, mirror, x1, y1, x2, y2, r, className) {
   });
 }
 
-// Board: a solid line (seen edge-on, from above) with a second, thinner
-// line running its full length for the chalk tray — no color fill.
-function buildTableauIcon(g, orientation) {
+// The wall line itself: a solid line, seen edge-on from above, dead-center
+// on the cell border (WALL_Y). Used standalone as the "mur" border object,
+// and as the base tableau/porte draw their own detail on top of (a board or
+// a door is set INTO a wall, so its own line sits at the same position).
+function buildWallLine(g, orientation) {
   g.appendChild(
-    laneLine(orientation, false, 6, 16, 214, 16, "cll-border-icon-board"),
-  );
-  g.appendChild(
-    laneLine(orientation, false, 6, 25, 214, 25, "cll-border-icon-path"),
+    laneLine(orientation, {}, 6, WALL_Y, 214, WALL_Y, "cll-border-icon-wall"),
   );
 }
 
-// Window: a set of parallel lines across the wall gap — the standard
-// top-down "glazed opening" pictogram.
+// Plain wall segment: just the wall line, no further detail.
+function buildMurIcon(g, orientation) {
+  buildWallLine(g, orientation);
+}
+
+// Board: the wall line itself, plus a thinner line offset to one side for
+// the chalk tray — no color fill. `flip` ("retourner le tableau") moves the
+// tray to the other face of the wall.
+function buildTableauIcon(g, orientation, flip) {
+  buildWallLine(g, orientation);
+  const mirrorY = !!flip;
+  g.appendChild(
+    laneLine(
+      orientation,
+      { mirrorY },
+      6,
+      WALL_Y + 9,
+      214,
+      WALL_Y + 9,
+      "cll-border-icon-path",
+    ),
+  );
+}
+
+// Window: the same width as the wall, but translucent (the glazed opening),
+// with a thin solid line down the middle (the frame's center mullion).
 function buildFenetreIcon(g, orientation) {
-  [14, 20, 26].forEach((y) => {
-    g.appendChild(
-      laneLine(orientation, false, 6, y, 214, y, "cll-border-icon-path"),
-    );
-  });
+  g.appendChild(
+    laneLine(orientation, {}, 6, WALL_Y, 214, WALL_Y, "cll-border-icon-window"),
+  );
+  g.appendChild(
+    laneLine(
+      orientation,
+      {},
+      6,
+      WALL_Y,
+      214,
+      WALL_Y,
+      "cll-border-icon-window-mullion",
+    ),
+  );
 }
 
-// Door ajar: a threshold line spanning the opening, a hinge near one end,
-// and the leaf itself running almost the full width — barely cracked open,
-// so the dashed arc tracing its sweep sits at the far end of the border
-// (not a short stub in the middle). `rotation` (0/180, see rotateBorderAt
-// in src/model.js) mirrors the whole symbol along the wall to flip which
-// side it opens from.
-function buildPorteIcon(g, orientation, rotation) {
-  const mirror = rotation === 180;
-  const hinge = [10, 34];
-  const closed = [202, 34]; // leaf flat along the baseline
-  const open = [200, 6]; // leaf ajar, same ~length, just lifted
-  g.appendChild(
-    laneLine(orientation, false, 6, 34, 214, 34, "cll-border-icon-path"),
-  );
+// Door ajar: the standard architectural symbol — leaf hinged near one end,
+// spanning most of the opening's width, swung open with the swept arc
+// tracing its path back to the closed position (flat along the wall). A
+// real door swung this wide reaches well beyond the wall's own thickness —
+// the icon is allowed to overflow its lane for that (see
+// .cll-border-icon, style.css) rather than being squashed to fit it.
+// `rotation` (0/180, see rotateBorderAt in src/model.js) mirrors the whole
+// symbol along the wall — "changer le sens d'ouverture", which end the
+// hinge is on. `flip` (see flipBorderAt) mirrors it across the wall's
+// thickness — "retourner la porte" (like the tableau), which room it swings
+// into. The two are independent and combine freely.
+function buildPorteIcon(g, orientation, rotation, flip) {
+  buildWallLine(g, orientation);
+  const xform = { mirrorX: rotation === 180, mirrorY: !!flip };
+  const hinge = [10, WALL_Y];
+  // Leaf length fixes the swing radius; closed (flat along the wall) and
+  // open (30° from the wall) are both that same distance from the hinge, so
+  // the leaf and the arc tracing its sweep stay geometrically consistent.
+  // Sized to span nearly the full wall segment lengthwise (x stays within
+  // the lane, 10..~202 of 0..220) — only the swing itself (y) overflows the
+  // lane's thickness, which is expected: a real door open this wide reaches
+  // well past the wall into the room.
+  const leafLength = 192;
+  const openAngleDeg = 30;
+  const rad = (openAngleDeg * Math.PI) / 180;
+  const closed = [hinge[0] + leafLength, WALL_Y];
+  const open = [
+    hinge[0] + leafLength * Math.cos(rad),
+    WALL_Y - leafLength * Math.sin(rad),
+  ];
   g.appendChild(
     laneArc(
       orientation,
-      mirror,
+      xform,
       ...closed,
       ...open,
-      192,
+      leafLength,
       "cll-border-icon-arc",
     ),
   );
   g.appendChild(
-    laneLine(orientation, mirror, ...hinge, ...open, "cll-border-icon-leaf"),
+    laneLine(orientation, xform, ...hinge, ...open, "cll-border-icon-leaf"),
   );
   g.appendChild(
-    laneCircle(orientation, mirror, ...hinge, 2.5, "cll-border-icon-hinge"),
+    laneCircle(orientation, xform, ...hinge, 2.5, "cll-border-icon-hinge"),
   );
 }
 
-export function buildBorderIcon(type, orientation = "h", rotation = 0) {
+export function buildBorderIcon(
+  type,
+  orientation = "h",
+  rotation = 0,
+  flip = false,
+) {
   const viewBox =
     orientation === "v"
       ? `0 0 ${LANE_THICK} ${LANE_LEN}`
@@ -160,9 +248,10 @@ export function buildBorderIcon(type, orientation = "h", rotation = 0) {
     class: `cll-border-icon cll-border-icon--${type}`,
     "aria-hidden": "true",
   });
-  if (type === "tableau") buildTableauIcon(svg, orientation);
+  if (type === "tableau") buildTableauIcon(svg, orientation, flip);
   else if (type === "fenetre") buildFenetreIcon(svg, orientation);
-  else buildPorteIcon(svg, orientation, rotation);
+  else if (type === "mur") buildMurIcon(svg, orientation);
+  else buildPorteIcon(svg, orientation, rotation, flip);
   return svg;
 }
 
@@ -196,6 +285,29 @@ const MENU_ICON_PATHS = {
     },
     { tag: "line", attrs: { x1: 12.5, y1: 4.5, x2: 12.5, y2: 9.5 } },
     { tag: "line", attrs: { x1: 10, y1: 7, x2: 15, y2: 7 } },
+  ],
+  dock: [
+    { tag: "line", attrs: { x1: 2, y1: 3, x2: 14, y2: 3 } },
+    {
+      tag: "rect",
+      attrs: { x: 5, y: 4, width: 6, height: 7, rx: 1, fill: "none" },
+    },
+  ],
+  arrowUp: [
+    { tag: "line", attrs: { x1: 8, y1: 13, x2: 8, y2: 4 } },
+    { tag: "polygon", attrs: { points: "8,2 4.5,7 11.5,7" } },
+  ],
+  arrowDown: [
+    { tag: "line", attrs: { x1: 8, y1: 3, x2: 8, y2: 12 } },
+    { tag: "polygon", attrs: { points: "8,14 4.5,9 11.5,9" } },
+  ],
+  arrowLeft: [
+    { tag: "line", attrs: { x1: 13, y1: 8, x2: 4, y2: 8 } },
+    { tag: "polygon", attrs: { points: "2,8 7,4.5 7,11.5" } },
+  ],
+  arrowRight: [
+    { tag: "line", attrs: { x1: 3, y1: 8, x2: 12, y2: 8 } },
+    { tag: "polygon", attrs: { points: "14,8 9,4.5 9,11.5" } },
   ],
   trash: [
     { tag: "line", attrs: { x1: 3.5, y1: 4.5, x2: 12.5, y2: 4.5 } },

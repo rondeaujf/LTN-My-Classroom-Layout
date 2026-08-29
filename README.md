@@ -2,7 +2,7 @@
 
 Standalone JavaScript module (vanilla, no framework dependency) for building
 an **interactive classroom seating chart**: desk grid, rotation and color on
-right-click, student assignment, border objects (board, door, window),
+right-click, student assignment, border objects (wall, board, door, window),
 print / PDF export via the browser.
 
 Shipped as plain ESM (no build step required to use it): any app (with or
@@ -53,15 +53,36 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
 - **Click an occupied desk**: removes the student (the desk stays).
 - **Click an empty desk**: removes the desk.
 - **Right-click a cell** (empty or occupied): context menu — assign / change
-  / remove a student, rotate the desk a quarter turn, change its color,
-  remove the desk, or add a desk on an empty cell (so every left-click
-  action is also reachable here).
-- **Click a cell border**: offers a choice (board / door / window) if the
-  border is empty; a second click on a border that already has an object
+  / remove a student, rotate the desk a quarter turn, two independent ways
+  to move it out of its default centered position: "stick to the edge" (a
+  small nudge, flush against its own cell's edge — follows the desk's
+  rotation, toward its own "head", the side opposite the chair) and 4
+  direction entries (↑/↓/←/→, one active at a time — picking the active one
+  again clears it) to shift it half a cell up/down/left/right, screen-
+  absolute regardless of rotation, so two desks in adjacent cells can meet
+  in the middle, head to head — change its color, remove the desk, or add a
+  desk on an empty cell (so every left-click action is also reachable
+  here). Both can be combined. A desk's drawing is exactly 2:1
+  (width:depth), so it keeps a clean half-cell alignment when rotated 90°.
+  When a student's `level` is shown, its badge always sits in the desk's
+  top-left corner _from the viewer's point of view_ — not whichever local
+  corner "top-left" happens to rotate to — so it stays legible and
+  consistently placed at any rotation.
+- **Click a cell border**: offers a choice (wall / board / door / window) if
+  the border is empty; a second click on a border that already has an object
   removes it. Right-clicking a border offers the same choice when empty; on
-  an existing door it offers "change opening side" (flips which side it
-  swings from, drawn as an ajar door with a swing arc) in addition to
-  removing it.
+  an existing door it offers "change opening side" (mirrors which end the
+  hinge is on, i.e. which side it swings from) AND "flip the door" (mirrors
+  it across the wall, i.e. which room it swings into) — independent of each
+  other, drawn as an ajar door with a swing arc; on an existing board, "flip
+  the board" (moves the chalk tray to the other face of the wall, same
+  mirror-across-the-wall as the door's flip). A board or a door is drawn as
+  set into a wall (same wall line, so they align with a plain wall segment
+  placed next to them); a window is a gap in the wall, no wall line of its
+  own.
+  Once every edge around the desks' bounding rectangle carries a border
+  object (any type), the grid gets a `cll-grid--closed` class (see
+  `isRoomEnclosed()` in `src/model.js`).
 - **Assign a student**: list of students without a desk yet (if
   `options.students` is supplied), with search, or free-text entry of a
   name. If `options.teacher` is documented, the teacher also appears in that
@@ -74,8 +95,12 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
 - **Print / PDF export**: opens the browser's print dialog ("Save as PDF" is
   one of its destinations) on a dedicated A4 layout — school/teacher/year
   header (or blank fields to fill in by hand if `options.teacher` isn't
-  supplied) and the subtitle. The editing grid's dashed guide lines are not
-  printed, only the placed desks and border objects are.
+  supplied), the subtitle, and (if `options.logoUrl` is supplied) the host
+  app's logo centered at the bottom, mirroring the site's other PDF
+  exports. The editing grid's dashed guide lines are not printed, only the
+  placed desks and border objects are. A host app can take over entirely
+  with `options.onPrint` (e.g. to render its own PDF from
+  `buildPrintSheet()` instead of the browser dialog).
 
 Every change is applied immediately to the state and triggers
 `options.persistence.save` (lightly debounced, then always flushed on
@@ -94,15 +119,17 @@ ring — not pinned to 5×6.
 
 ### `new ClassroomLayout(container, options?)`
 
-| Option        | Type                                                         | Description                                                                                                                                                                                      |
-| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `gridDefault` | `{cols, rows}`                                               | Initial grid when no configuration is loaded (default `{cols:5, rows:6}`).                                                                                                                       |
-| `students`    | `Array<{id?, firstName?, lastName?, name?, level?, group?}>` | Optional list offered when assigning a student.                                                                                                                                                  |
-| `colors`      | `Array<string \| {label?, value}>`                           | Optional preferred colors (site colors, subject colors…).                                                                                                                                        |
-| `teacher`     | `{firstName?, lastName?, className?, school?, year?}`        | Optional teacher info, shown in the print header. If absent, the print header fields are left blank for the teacher to fill in by hand, and the teacher entry above the roster doesn't appear.   |
-| `persistence` | `{load(), save(state)}`                                      | Persistence adapter supplied by the host app (`load` can be async; `save` receives the full state). Without it, nothing is loaded/saved — the host app manages `getState()`/`setState()` itself. |
-| `onChange`    | `(state) => void`                                            | Optional callback invoked after every change.                                                                                                                                                    |
-| `nameFit`     | `{max?, min?}`                                               | Bounds (px) for the automatic size-down of the student name shown on the desk.                                                                                                                   |
+| Option        | Type                                                         | Description                                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gridDefault` | `{cols, rows}`                                               | Initial grid when no configuration is loaded (default `{cols:5, rows:6}`).                                                                                                                                 |
+| `students`    | `Array<{id?, firstName?, lastName?, name?, level?, group?}>` | Optional list offered when assigning a student.                                                                                                                                                            |
+| `colors`      | `Array<string \| {label?, value}>`                           | Optional preferred colors (site colors, subject colors…).                                                                                                                                                  |
+| `teacher`     | `{firstName?, lastName?, className?, school?, year?}`        | Optional teacher info, shown in the print header. If absent, the print header fields are left blank for the teacher to fill in by hand, and the teacher entry above the roster doesn't appear.             |
+| `persistence` | `{load(), save(state)}`                                      | Persistence adapter supplied by the host app (`load` can be async; `save` receives the full state). Without it, nothing is loaded/saved — the host app manages `getState()`/`setState()` itself.           |
+| `onChange`    | `(state) => void`                                            | Optional callback invoked after every change.                                                                                                                                                              |
+| `onPrint`     | `(state, {teacher, logoUrl}) => void`                        | Optional override for `layout.print()` — if supplied, called instead of opening the browser's print dialog (e.g. to render a PDF from `buildPrintSheet()` and show it however the host app displays PDFs). |
+| `logoUrl`     | `string`                                                     | Optional host-app logo URL, shown centered at the bottom of the print/PDF sheet (mirrors the site's other PDF exports).                                                                                    |
+| `nameFit`     | `{max?, min?}`                                               | Bounds (px) for the automatic size-down of the student name shown on the desk.                                                                                                                             |
 
 ### Methods
 
@@ -114,9 +141,13 @@ ring — not pinned to 5×6.
 - `layout.destroy()` — detaches listeners, flushes any pending save, empties the container.
 
 Pure model functions are also exported (`toggleDeskAt`, `rotateDeskAt`,
-`setDeskColorAt`, `assignStudentAt`, `unassignStudentAt`, `setBorderAt`,
-`clearBorderAt`, `rotateBorderAt`, `fitGridToContentWithRing`,
-`serializeState`, `deserializeState`, …) — see `src/model.js`.
+`toggleDeskStuckAt`, `setDeskHalfShiftAt`, `setDeskColorAt`, `assignStudentAt`, `unassignStudentAt`, `setBorderAt`,
+`clearBorderAt`, `rotateBorderAt`, `flipBorderAt`, `isRoomEnclosed`, `fitGridToContentWithRing`,
+`serializeState`, `deserializeState`, …) — see `src/model.js` — as is
+`buildPrintSheet(state, {teacher, editableTeacherInputs, logoUrl})`, the
+detached DOM node used by `options.onPrint` (see `src/print.js`) — fully
+styled outside of an actual browser print too (e.g. for `html2canvas`),
+not just under `@media print`.
 
 ## State JSON schema
 
@@ -129,6 +160,8 @@ Pure model functions are also exported (`toggleDeskAt`, `rotateDeskAt`,
     "2_3": {
       "type": "desk",
       "rotation": 90, // 0 | 90 | 180 | 270
+      "stuck": false, // flush against its own "head" edge instead of the usual margin
+      "halfShift": null, // "up" | "down" | "left" | "right" | null — shifted half a cell that direction, screen-absolute
       "color": "#e07a5f", // or "rgba(r,g,b,a)", or null
       "student": { "id": "1", "name": "Ada Lovelace", "level": "Grade 5" }, // or null
     },
@@ -136,7 +169,11 @@ Pure model functions are also exported (`toggleDeskAt`, `rotateDeskAt`,
   "edges": {
     // horizontal borders: "h_{line 0..rows}_{col 0..cols-1}"
     // vertical borders:   "v_{row 0..rows-1}_{line 0..cols}"
-    "h_0_2": { "type": "tableau", "rotation": 0 }, // "tableau" | "porte" | "fenetre"; rotation 0|180 (only meaningful for "porte")
+    "h_0_2": {
+      "type": "tableau", // "tableau" | "porte" | "fenetre" | "mur"
+      "rotation": 0, // 0 | 180 — "changer le sens d'ouverture" (door only)
+      "flip": false, // "retourner" — door or tableau, across the wall (independent of rotation)
+    },
     "v_3_5": { "type": "fenetre", "rotation": 0 },
   },
   "recentColors": ["#e07a5f"], // custom colors the user recently picked

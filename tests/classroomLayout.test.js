@@ -80,6 +80,76 @@ describe("ClassroomLayout", () => {
     expect(layout.getState().cells["0_0"]).toBeUndefined();
   });
 
+  it("keeps the student name centered on the desk-top rect's own true center, whatever the desk's rotation", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { name: "Ada Lovelace" },
+        },
+      },
+    }));
+
+    // Unlike the level badge (anchored at a corner, which genuinely moves
+    // relative to the desk when it rotates), the rect's own center never
+    // moves relative to the desk's own rotation pivot — so the name's
+    // anchor point must be identical at every rotation; only its
+    // counter-rotation (to stay upright) changes. See RECT_HALF_HEIGHT in
+    // src/render.js.
+    let previousTop;
+    for (const rotation of [0, 90, 180, 270]) {
+      layout.applyChange((s) => ({
+        ...s,
+        cells: { "0_0": { ...s.cells["0_0"], rotation } },
+      }));
+      const nameEl = container.querySelector(".cll-desk-name");
+      if (previousTop !== undefined) expect(nameEl.style.top).toBe(previousTop);
+      previousTop = nameEl.style.top;
+      expect(nameEl.style.transform).toBe(
+        `translate(-50%, -50%) rotate(${-rotation}deg)`,
+      );
+    }
+  });
+
+  it("renders the level badge, counter-rotated to stay upright whatever the desk's rotation", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { name: "Ada", level: "CE2" },
+        },
+      },
+    }));
+
+    // The actual top/left values depend on the badge's real rendered size
+    // (offsetWidth/Height, read via a rAF-deferred pass so the node is
+    // laid out first) — see positionLevelBadge in src/render.js — which
+    // jsdom can't produce (no real layout engine: clientWidth/offsetWidth
+    // are always 0), so the positioning *formula* is unit-tested directly,
+    // with concrete numbers, in tests/render.test.js (plateauTopLeftLocal).
+    // Here: just that the badge renders with the right text and stays
+    // counter-rotated, whatever the desk's own rotation.
+    for (const rotation of [0, 90, 180, 270]) {
+      layout.applyChange((s) => ({
+        ...s,
+        cells: { "0_0": { ...s.cells["0_0"], rotation } },
+      }));
+      const levelEl = container.querySelector(".cll-desk-level");
+      expect(levelEl.textContent).toBe("CE2");
+      expect(levelEl.style.transform).toBe(`rotate(${-rotation}deg)`);
+    }
+  });
+
   it("schedules a debounced save and flushes it on destroy", async () => {
     vi.useFakeTimers();
     const save = vi.fn();
@@ -112,6 +182,47 @@ describe("ClassroomLayout", () => {
     expect(items).toContain("Affecter un élève…");
     expect(items).toContain("Faire pivoter (90°)");
     expect(items).toContain("Supprimer le bureau");
+  });
+
+  it("offers the 4 half-shift directions, picking one sets it, picking it again clears it", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": { type: "desk", rotation: 0, color: null, student: null },
+      },
+    }));
+    const cell = container.querySelector('[data-row="0"][data-col="0"]');
+
+    click(cell, "contextmenu");
+    let items = Array.from(document.querySelectorAll(".cll-menu-item")).map(
+      (li) => li.textContent,
+    );
+    expect(items).toContain("Décaler vers le haut");
+    expect(items).toContain("Décaler vers le bas");
+    expect(items).toContain("Décaler vers la gauche");
+    expect(items).toContain("Décaler vers la droite");
+
+    click(
+      Array.from(document.querySelectorAll(".cll-menu-item")).find(
+        (li) => li.textContent === "Décaler vers la droite",
+      ),
+    );
+    expect(layout.getState().cells["0_0"].halfShift).toBe("right");
+
+    // The grid is fully rebuilt on every change (see renderGrid) — re-query
+    // instead of reusing `cell`, now detached from the document.
+    click(
+      container.querySelector('[data-row="0"][data-col="0"]'),
+      "contextmenu",
+    );
+    click(
+      Array.from(document.querySelectorAll(".cll-menu-item")).find(
+        (li) => li.textContent === "Décaler vers la droite ✓",
+      ),
+    );
+    expect(layout.getState().cells["0_0"].halfShift).toBeNull();
   });
 
   it("lets the documented teacher be assigned to more than one desk", async () => {
@@ -149,20 +260,20 @@ describe("ClassroomLayout", () => {
     expect(document.querySelector(".cll-student-list li")).not.toBeNull();
   });
 
-  it("right-clicking an empty border offers the tableau/porte/fenetre choice", async () => {
+  it("right-clicking an empty border offers the tableau/porte/fenetre/mur choice", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     const edge = container.querySelector('.cll-edge[data-edge-key="h_0_0"]');
     click(edge, "contextmenu");
-    expect(document.querySelectorAll(".cll-borderpicker-btn").length).toBe(3);
+    expect(document.querySelectorAll(".cll-borderpicker-btn").length).toBe(4);
   });
 
-  it("lets a door's opening side be flipped from its right-click menu", async () => {
+  it("lets a door's opening side and orientation be changed from its right-click menu", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     layout.applyChange((s) => ({
       ...s,
-      edges: { h_0_0: { type: "porte", rotation: 0 } },
+      edges: { h_0_0: { type: "porte", rotation: 0, flip: false } },
     }));
 
     click(
@@ -172,13 +283,42 @@ describe("ClassroomLayout", () => {
     const items = Array.from(document.querySelectorAll(".cll-menu-item")).map(
       (li) => li.textContent,
     );
-    expect(items).toEqual(["Changer le sens d'ouverture", "Supprimer"]);
+    expect(items).toEqual([
+      "Changer le sens d'ouverture",
+      "Retourner la porte",
+      "Supprimer",
+    ]);
 
     click(document.querySelector(".cll-menu-item"));
     expect(layout.getState().edges.h_0_0.rotation).toBe(180);
+
+    click(
+      container.querySelector('.cll-edge[data-edge-key="h_0_0"]'),
+      "contextmenu",
+    );
+    click(document.querySelectorAll(".cll-menu-item")[1]);
+    expect(layout.getState().edges.h_0_0.flip).toBe(true);
   });
 
-  it("only offers Supprimer for a non-door border (tableau/fenetre are symmetric)", async () => {
+  it("only offers Supprimer for fenetre (its icon is symmetric)", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      edges: { h_0_0: { type: "fenetre", rotation: 0 } },
+    }));
+
+    click(
+      container.querySelector('.cll-edge[data-edge-key="h_0_0"]'),
+      "contextmenu",
+    );
+    const items = Array.from(document.querySelectorAll(".cll-menu-item")).map(
+      (li) => li.textContent,
+    );
+    expect(items).toEqual(["Supprimer"]);
+  });
+
+  it("lets a tableau be flipped (chalk tray side) from its right-click menu", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     layout.applyChange((s) => ({
@@ -193,6 +333,51 @@ describe("ClassroomLayout", () => {
     const items = Array.from(document.querySelectorAll(".cll-menu-item")).map(
       (li) => li.textContent,
     );
-    expect(items).toEqual(["Supprimer"]);
+    expect(items).toEqual(["Retourner le tableau", "Supprimer"]);
+
+    click(document.querySelector(".cll-menu-item"));
+    expect(layout.getState().edges.h_0_0.flip).toBe(true);
+  });
+});
+
+describe("print()", () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  it("calls options.onPrint instead of window.print() when supplied", async () => {
+    const onPrint = vi.fn();
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    const layout = new ClassroomLayout(container, {
+      teacher: { firstName: "J.", lastName: "Doe" },
+      logoUrl: "/logo.png",
+      onPrint,
+    });
+    await layout.ready;
+
+    layout.print();
+
+    expect(onPrint).toHaveBeenCalledTimes(1);
+    const [state, { teacher, logoUrl }] = onPrint.mock.calls[0];
+    expect(state).toEqual(layout.getState());
+    expect(teacher).toEqual({ firstName: "J.", lastName: "Doe" });
+    expect(logoUrl).toBe("/logo.png");
+    expect(printSpy).not.toHaveBeenCalled();
+
+    printSpy.mockRestore();
+  });
+
+  it("falls back to window.print() without options.onPrint", async () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+
+    layout.print();
+
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    printSpy.mockRestore();
   });
 });

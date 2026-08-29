@@ -9,6 +9,10 @@ import {
   setBorderAt,
   clearBorderAt,
   rotateBorderAt,
+  flipBorderAt,
+  toggleDeskStuckAt,
+  setDeskHalfShiftAt,
+  HALF_SHIFT_DIRECTIONS,
 } from "./model.js";
 import { openContextMenu } from "./menu.js";
 import { openColorPicker } from "./colorPicker.js";
@@ -18,6 +22,19 @@ import { openBorderPicker } from "./borderPicker.js";
 // Stable id for the "teacher" entry synthesized from `options.teacher` (see
 // teacherStudentEntry below). Never collides with a real roster id.
 const TEACHER_STUDENT_ID = "__teacher__";
+
+const HALF_SHIFT_LABELS = {
+  up: "Décaler vers le haut",
+  down: "Décaler vers le bas",
+  left: "Décaler vers la gauche",
+  right: "Décaler vers la droite",
+};
+const HALF_SHIFT_ICONS = {
+  up: "arrowUp",
+  down: "arrowDown",
+  left: "arrowLeft",
+  right: "arrowRight",
+};
 
 function assignedStudentIds(state) {
   const ids = new Set();
@@ -107,6 +124,22 @@ function openCellContextMenu(x, y, row, col, ctx) {
       onSelect: () => ctx.applyChange((s) => rotateDeskAt(s, row, col)),
     });
     items.push({
+      label: cell.stuck ? "Détacher du bord" : "Coller au bord",
+      icon: "dock",
+      onSelect: () => ctx.applyChange((s) => toggleDeskStuckAt(s, row, col)),
+    });
+    for (const direction of HALF_SHIFT_DIRECTIONS) {
+      const active = cell.halfShift === direction;
+      items.push({
+        label: active
+          ? `${HALF_SHIFT_LABELS[direction]} ✓`
+          : HALF_SHIFT_LABELS[direction],
+        icon: HALF_SHIFT_ICONS[direction],
+        onSelect: () =>
+          ctx.applyChange((s) => setDeskHalfShiftAt(s, row, col, direction)),
+      });
+    }
+    items.push({
       label: "Couleur…",
       icon: "palette",
       onSelect: () => openColorPopup(x, y, row, col, ctx),
@@ -147,13 +180,23 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
   }
 
   const items = [];
-  // Rotation only makes a visible difference for a door (which side it
-  // swings open from) — tableau/fenetre icons are symmetric under 180°.
+  // fenetre's icon is symmetric either way; mur has no orientation at all.
   if (edge.type === "porte") {
     items.push({
       label: "Changer le sens d'ouverture",
       icon: "rotate",
       onSelect: () => ctx.applyChange((s) => rotateBorderAt(s, edgeKey)),
+    });
+    items.push({
+      label: "Retourner la porte",
+      icon: "rotate",
+      onSelect: () => ctx.applyChange((s) => flipBorderAt(s, edgeKey)),
+    });
+  } else if (edge.type === "tableau") {
+    items.push({
+      label: "Retourner le tableau",
+      icon: "rotate",
+      onSelect: () => ctx.applyChange((s) => flipBorderAt(s, edgeKey)),
     });
   }
   items.push({

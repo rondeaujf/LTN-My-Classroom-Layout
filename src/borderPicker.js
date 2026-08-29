@@ -2,7 +2,12 @@ import { openFloating } from "./popup.js";
 import { buildBorderIcon } from "./svg.js";
 import { BORDER_TYPES } from "./model.js";
 
-const LABELS = { tableau: "Tableau", porte: "Porte", fenetre: "Fenêtre" };
+const LABELS = {
+  tableau: "Tableau",
+  porte: "Porte",
+  fenetre: "Fenêtre",
+  mur: "Mur",
+};
 
 export function openBorderPicker(x, y, { onPick, anchorEl }) {
   return openFloating(

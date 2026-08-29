@@ -41,12 +41,14 @@
   background: rgba(47, 111, 158, 0.06);
 }
 
+/* Full width/height of the cell, no margin: adjacent desks butt up against
+   each other so several placed side by side read as one large table. */
 .cll-desk {
   position: absolute;
-  top: 10%;
-  left: 10%;
-  width: 80%;
-  height: 80%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   cursor: pointer;
   transition: transform 0.15s ease;
 }
@@ -74,11 +76,12 @@
   fill: var(--cll-figure);
 }
 
+/* top and transform (translate + counter-rotation) are set inline per-desk,
+   see render.js — anchored at the desk-top rect's own true local center, so
+   it stays centered on the plateau at every rotation ("stuck" included). */
 .cll-desk-name {
   position: absolute;
-  top: 34%;
   left: 50%;
-  transform: translate(-50%, -50%);
   max-width: 78%;
   font-weight: 700;
   text-align: center;
@@ -88,10 +91,11 @@
   color: #1c2b33;
 }
 
+/* top/left are set inline per-desk, see render.js (positionLevelBadge) —
+   the badge always reads top-left from the viewer's point of view, whatever
+   the desk's rotation, so its actual local anchor corner varies. */
 .cll-desk-level {
   position: absolute;
-  top: 6%;
-  left: 8%;
   font-size: 10px;
   font-weight: 600;
   color: #55707f;
@@ -137,8 +141,16 @@
   display: block;
 }
 
-/* The board itself: just a solid line, seen edge-on from above. */
-.cll-border-icon-board {
+/* A door swung open reaches well beyond the wall's own thickness (see
+   buildPorteIcon, src/svg.js) — let it spill past its lane instead of being
+   clipped/squashed to fit it. */
+.cll-border-icon--porte {
+  overflow: visible;
+}
+
+/* The wall line: the standalone "mur" border object, and the base tableau
+   and porte draw their own detail onto (set into a wall, same position). */
+.cll-border-icon-wall {
   stroke: var(--cll-accent, #2f6f9e);
   stroke-width: 8;
   stroke-linecap: round;
@@ -150,6 +162,21 @@
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Window: same width as the wall, but translucent (the glazed opening). */
+.cll-border-icon-window {
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 8;
+  stroke-linecap: round;
+  opacity: 0.3;
+}
+
+/* The frame's center mullion: thin and fully opaque, on top of the window. */
+.cll-border-icon-window-mullion {
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 
 .cll-border-icon-leaf {
@@ -405,8 +432,60 @@
 }
 
 /* ---- Print ---- */
+/* Unconditional (not @media print) except the display:none/block toggle:
+   a host app can render this sheet outside of an actual browser print (e.g.
+   via html2canvas for its own PDF export, cf. options.onPrint) and still
+   get it fully styled — see src/print.js buildPrintSheet(). */
 .cll-print-sheet {
   display: none;
+  width: 100%;
+  color: #2c3e50;
+}
+
+/* Mirrors the "student list" PDF export banner already used elsewhere in
+   the host app: bold school/teacher row, dark rule, gray meta line. */
+.cll-print-header {
+  border-bottom: 2px solid #2c3e50;
+  margin-bottom: 10px;
+  padding-bottom: 4px;
+}
+
+.cll-print-banner-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cll-print-school,
+.cll-print-teacher {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cll-print-meta {
+  font-size: 11px;
+  color: #566573;
+  margin-top: 2px;
+}
+
+/* The dashed editing grid is a canvas aid, not part of the printed room
+   plan — only placed desks/objects should show up on paper. */
+.cll-print-grid-host .cll-cell {
+  border: none;
+}
+
+.cll-print-grid-host .cll-edge:not(.cll-edge--set) {
+  display: none;
+}
+
+.cll-print-footer {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.cll-print-logo {
+  height: 16px;
+  width: auto;
 }
 
 @media print {
@@ -416,44 +495,6 @@
 
   .cll-print-sheet {
     display: block;
-    width: 100%;
-    color: #2c3e50;
-  }
-
-  /* Mirrors the "student list" PDF export banner already used elsewhere in
-     the host app: bold school/teacher row, dark rule, gray meta line. */
-  .cll-print-header {
-    border-bottom: 2px solid #2c3e50;
-    margin-bottom: 10px;
-    padding-bottom: 4px;
-  }
-
-  .cll-print-banner-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .cll-print-school,
-  .cll-print-teacher {
-    font-size: 15px;
-    font-weight: 700;
-  }
-
-  .cll-print-meta {
-    font-size: 11px;
-    color: #566573;
-    margin-top: 2px;
-  }
-
-  /* The dashed editing grid is a canvas aid, not part of the printed room
-     plan — only placed desks/objects should show up on paper. */
-  .cll-print-grid-host .cll-cell {
-    border: none;
-  }
-
-  .cll-print-grid-host .cll-edge:not(.cll-edge--set) {
-    display: none;
   }
 
   @page {
