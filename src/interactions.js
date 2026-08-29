@@ -224,9 +224,15 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
  * document.body — supplied by the ClassroomLayout instance (src/index.js).
  */
 export function attachInteractions(gridEl, ctx) {
+  // false : bords (mur/tableau/porte/fenêtre) verrouillés. La classe
+  // .cll-root--borders-locked coupe déjà pointer-events sur les .cll-edge
+  // (cf. style.css) — ce garde-fou couvre le cas où l'hôte gère le CSS
+  // autrement. Les bureaux restent pleinement éditables.
+  const bordersEditable = () => ctx.options.editableBorders !== false;
+
   const onClick = (e) => {
     const edge = e.target.closest(".cll-edge");
-    if (edge) {
+    if (edge && bordersEditable()) {
       handleEdgeClick(e.clientX, e.clientY, edge.dataset.edgeKey, ctx);
       return;
     }
@@ -238,7 +244,7 @@ export function attachInteractions(gridEl, ctx) {
 
   const onContextMenu = (e) => {
     const edge = e.target.closest(".cll-edge");
-    if (edge) {
+    if (edge && bordersEditable()) {
       e.preventDefault();
       openEdgeContextMenu(e.clientX, e.clientY, edge.dataset.edgeKey, ctx);
       return;

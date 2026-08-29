@@ -1,6 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { buildPrintSheet } from "../src/print.js";
-import { createEmptyState, toggleDeskAt } from "../src/model.js";
+import {
+  createEmptyState,
+  toggleDeskAt,
+  assignStudentAt,
+} from "../src/model.js";
+
+// A one-desk state with an assigned, levelled student — enough to observe
+// the name/level font bounds finalizeLayout writes (jsdom has no layout
+// engine, so fitText's shrink loop never runs and the font stays at its
+// `max`, which is exactly what these assertions check).
+function oneDeskState() {
+  let s = toggleDeskAt(createEmptyState({ cols: 3, rows: 3 }), 1, 1);
+  s = assignStudentAt(s, 1, 1, {
+    firstName: "Ada",
+    lastName: "Lovelace",
+    level: "CE2",
+  });
+  return s;
+}
 
 describe("buildPrintSheet", () => {
   it("returns a detached sheet (not attached to the document)", () => {
@@ -49,5 +67,34 @@ describe("buildPrintSheet", () => {
     expect(grid.style.getPropertyValue("--cll-rows")).toBe("1");
     // buildPrintSheet must not mutate the state it was given.
     expect(state.grid).toEqual({ cols: 14, rows: 14 });
+  });
+
+  it("defaults printOrientation/printPaper on the sheet dataset (portrait / A4)", () => {
+    const sheet = buildPrintSheet(createEmptyState());
+    expect(sheet.dataset.printOrientation).toBe("portrait");
+    expect(sheet.dataset.printPaper).toBe("A4");
+  });
+
+  it("carries the requested printOrientation/printPaper on the sheet dataset for the host's own PDF renderer", () => {
+    const sheet = buildPrintSheet(createEmptyState(), {
+      printOrientation: "landscape",
+      printPaper: "A3",
+    });
+    expect(sheet.dataset.printOrientation).toBe("landscape");
+    expect(sheet.dataset.printPaper).toBe("A3");
+  });
+
+  it("forwards nameFit / levelFit into the rendered grid", () => {
+    const sheet = buildPrintSheet(oneDeskState(), {
+      nameFit: { max: 20 },
+      levelFit: { max: 15 },
+    });
+    expect(sheet.querySelector(".cll-desk-name").style.fontSize).toBe("20px");
+    expect(sheet.querySelector(".cll-desk-level").style.fontSize).toBe("15px");
+  });
+
+  it("badge font defaults to 8px (levelFit.max default)", () => {
+    const sheet = buildPrintSheet(oneDeskState());
+    expect(sheet.querySelector(".cll-desk-level").style.fontSize).toBe("8px");
   });
 });
