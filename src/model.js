@@ -11,8 +11,8 @@ export function parseCellKey(key) {
   return { row, col };
 }
 
-// Bordures adressées par ligne de grille (pas par cellule) pour qu'un bord
-// intérieur partagé entre deux cellules n'ait qu'une seule clé possible.
+// Borders are addressed by grid line (not by cell), so an interior border
+// shared by two cells only ever has one possible key.
 export function hEdgeKey(line, col) {
   return `h_${line}_${col}`;
 }
@@ -31,9 +31,9 @@ export function createEmptyState(grid = DEFAULT_GRID) {
     edges: {},
     recentColors: [],
     subtitle: "",
-    // Rempli seulement si aucun enseignant n'est fourni en option par l'app
-    // hôte (cf. README, "Infos enseignant") : saisie libre sur l'impression,
-    // mémorisée pour la prochaine ouverture comme le reste.
+    // Only used when the host app doesn't supply `options.teacher` (see
+    // README, "Teacher info"): free text entered at print time, remembered
+    // for next time like everything else.
     teacherOverride: null,
     meta: { updatedAt: new Date().toISOString() },
   };
@@ -117,11 +117,11 @@ export function unassignStudentAt(state, row, col) {
 
 export function setBorderAt(state, edgeKey, type) {
   if (!BORDER_TYPES.includes(type)) {
-    throw new Error(`Type de bordure inconnu : ${type}`);
+    throw new Error(`Unknown border type: ${type}`);
   }
   return touch({
     ...state,
-    edges: { ...state.edges, [edgeKey]: { type } },
+    edges: { ...state.edges, [edgeKey]: { type, rotation: 0 } },
   });
 }
 
@@ -140,11 +140,24 @@ export function clearBorderAt(state, edgeKey) {
   return touch({ ...state, edges });
 }
 
+// Only meaningful for "porte" (door): flips which side it swings open from.
+// Harmless no-op-looking toggle for symmetric icons (tableau/fenetre) —
+// the UI only offers it for doors, cf. src/interactions.js.
+export function rotateBorderAt(state, edgeKey) {
+  const edge = state.edges[edgeKey];
+  if (!edge) return state;
+  const rotation = ((edge.rotation ?? 0) + 180) % 360;
+  return touch({
+    ...state,
+    edges: { ...state.edges, [edgeKey]: { ...edge, rotation } },
+  });
+}
+
 /**
- * Recalcule la grille comme le plus petit rectangle contenant tout le
- * contenu (bureaux + bordures) entouré d'une couronne d'une case vide,
- * et réindexe cells/edges en conséquence. Appelée au chargement d'une
- * configuration existante (jamais pendant l'édition en cours).
+ * Recomputes the grid as the smallest rectangle containing all content
+ * (desks + borders) surrounded by a one-cell empty ring, and reindexes
+ * cells/edges accordingly. Called when loading an existing configuration
+ * (never during live editing).
  */
 export function fitGridToContentWithRing(state, fallbackGrid = DEFAULT_GRID) {
   let minR = Infinity;

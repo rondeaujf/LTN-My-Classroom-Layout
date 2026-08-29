@@ -1,21 +1,24 @@
 import { renderGrid } from "./render.js";
 
-function teacherLine(teacher) {
+function teacherName(teacher) {
   if (!teacher) return "";
-  return [
-    [teacher.firstName, teacher.lastName].filter(Boolean).join(" "),
-    teacher.className,
-    teacher.school,
-    teacher.year,
-  ]
-    .filter(Boolean)
-    .join(" — ");
+  return [teacher.firstName, teacher.lastName].filter(Boolean).join(" ");
+}
+
+function metaLine(state, teacher) {
+  const parts = [teacher?.className, teacher?.year].filter(Boolean);
+  const left = parts.join(" · ");
+  if (left && state.subtitle) return `${left} — ${state.subtitle}`;
+  return left || state.subtitle || "";
 }
 
 /**
- * Ouvre la boîte de dialogue d'impression du navigateur ("Enregistrer en
- * PDF" y figure comme destination) sur une mise en page dédiée A4, isolée
- * du reste de la page via @media print (cf. style.css, .cll-print-sheet).
+ * Opens the browser's print dialog ("Save as PDF" is one of its
+ * destinations) on a dedicated A4 layout, isolated from the rest of the
+ * page via @media print (see style.css, .cll-print-sheet). The banner
+ * (school/teacher row + meta line, dark rule underneath) intentionally
+ * mirrors the "student list" PDF export banner already used elsewhere in
+ * the host app, for a consistent look across exports.
  */
 export function printLayout(state, { teacher, editableTeacherInputs } = {}) {
   const sheet = document.createElement("div");
@@ -23,27 +26,35 @@ export function printLayout(state, { teacher, editableTeacherInputs } = {}) {
 
   const header = document.createElement("div");
   header.className = "cll-print-header";
-  const line = teacherLine(teacher);
-  if (line) {
-    header.appendChild(
-      Object.assign(document.createElement("div"), {
+
+  const school = teacher?.school ?? "";
+  const name = teacherName(teacher);
+  if (school || name || editableTeacherInputs) {
+    const row = document.createElement("div");
+    row.className = "cll-print-banner-row";
+    row.appendChild(
+      Object.assign(document.createElement("span"), {
+        className: "cll-print-school",
+        textContent:
+          school || (editableTeacherInputs ? "École : _______________" : ""),
+      }),
+    );
+    row.appendChild(
+      Object.assign(document.createElement("span"), {
         className: "cll-print-teacher",
-        textContent: line,
+        textContent:
+          name || (editableTeacherInputs ? "Enseignant : _______________" : ""),
       }),
     );
-  } else if (editableTeacherInputs) {
-    header.appendChild(
-      Object.assign(document.createElement("div"), {
-        className: "cll-print-teacher-blank",
-        textContent: "Enseignant, classe, école, année : _______________",
-      }),
-    );
+    header.appendChild(row);
   }
-  if (state.subtitle) {
+
+  const meta = metaLine(state, teacher);
+  if (meta) {
     header.appendChild(
       Object.assign(document.createElement("div"), {
-        className: "cll-print-subtitle",
-        textContent: state.subtitle,
+        className: "cll-print-meta",
+        textContent: meta,
       }),
     );
   }

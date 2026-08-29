@@ -10,9 +10,8 @@ function el(tag, { className, attrs, text } = {}) {
   return node;
 }
 
-// Réduit la taille de police jusqu'à ce que le nom tienne sur une ligne
-// sans déborder du bureau (contrainte du cahier des charges : "taille max
-// sans dépasser").
+// Shrinks the font size until the name fits on one line without
+// overflowing the desk (spec requirement: "max size, never overflowing").
 function fitText(node, { max = 15, min = 7 } = {}) {
   let size = max;
   node.style.fontSize = `${size}px`;
@@ -53,7 +52,8 @@ function buildCell(row, col, cell, options) {
       if (name) {
         const nameEl = el("div", { className: "cll-desk-name", text: name });
         cellEl.appendChild(nameEl);
-        // Mesure différée : le nœud doit être dans le DOM (clientWidth réel).
+        // Deferred measurement: the node must be in the DOM for a real
+        // clientWidth.
         requestAnimationFrame(() => fitText(nameEl, options.nameFit));
       }
     }
@@ -71,15 +71,18 @@ function buildBorderZone(edgeKey, orientation, edge, geometry) {
     attrs: { "data-edge-key": edgeKey },
   });
   Object.assign(zone.style, geometry);
-  if (edge) zone.appendChild(buildBorderIcon(edge.type));
+  if (edge) {
+    const icon = buildBorderIcon(edge.type);
+    if (edge.rotation) icon.style.transform = `rotate(${edge.rotation}deg)`;
+    zone.appendChild(icon);
+  }
   return zone;
 }
 
 /**
- * (Re)construit entièrement la grille dans `container` à partir de `state`.
- * Ré-écrit tout le DOM à chaque appel : la grille reste petite (quelques
- * dizaines de cases), un re-render complet est plus simple qu'un diff et
- * reste largement assez rapide.
+ * Fully (re)builds the grid inside `container` from `state`. Rewrites the
+ * whole DOM on every call: the grid stays small (a few dozen cells), so a
+ * full re-render is simpler than diffing and still plenty fast.
  */
 export function renderGrid(container, state, options = {}) {
   container.replaceChildren();

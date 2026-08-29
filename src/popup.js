@@ -1,6 +1,6 @@
-// Panneau flottant générique (menu contextuel, sélecteur de couleur,
-// affectation d'élève, choix de bordure) : un seul panneau ouvert à la fois,
-// positionné près du point de clic et refermé au clic extérieur / Échap.
+// Generic floating panel (context menu, color picker, student assignment,
+// border choice): only one panel open at a time, positioned near the click
+// point and closed on outside click / Escape.
 
 let openEl = null;
 let cleanup = null;
@@ -38,8 +38,8 @@ export function openFloating(x, y, className, build) {
     panel.style.top = `${Math.max(0, y - rect.height)}px`;
   }
 
-  // Différé d'un tick : le clic/contextmenu qui vient d'ouvrir le panneau ne
-  // doit pas être capté par ce même listener et le refermer aussitôt.
+  // Deferred by one tick: the click/contextmenu that just opened the panel
+  // must not be caught by this same listener and close it right away.
   const onDocClick = (e) => {
     if (!panel.contains(e.target)) closeFloating();
   };

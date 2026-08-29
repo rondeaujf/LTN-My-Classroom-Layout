@@ -21,11 +21,11 @@ export class ClassroomLayout {
   /**
    * @param {string|Element} container
    * @param {object} [options]
-   * @param {{cols:number, rows:number}} [options.gridDefault] grille initiale (défaut 5x6) pour une configuration jamais enregistrée
+   * @param {{cols:number, rows:number}} [options.gridDefault] initial grid (default 5x6) for a configuration that was never saved
    * @param {Array<{id?, firstName?, lastName?, name?, level?, group?}>} [options.students]
-   * @param {Array<{label?, value}>|string[]} [options.colors] couleurs préférées (site/matières)
+   * @param {Array<{label?, value}>|string[]} [options.colors] preferred colors (site/subject colors)
    * @param {{firstName?, lastName?, className?, school?, year?}} [options.teacher]
-   * @param {{load(): any, save(state): void}} [options.persistence] adaptateur fourni par l'app hôte
+   * @param {{load(): any, save(state): void}} [options.persistence] persistence adapter supplied by the host app
    * @param {(state) => void} [options.onChange]
    */
   constructor(container, options = {}) {
@@ -111,8 +111,8 @@ export class ClassroomLayout {
   #scheduleSave() {
     if (!this.#options.persistence?.save) return;
     clearTimeout(this.#saveTimer);
-    // Léger différé pour éviter une sauvegarde à chaque frappe/déplacement ;
-    // flushée immédiatement par destroy() pour ne rien perdre à la fermeture.
+    // Lightly debounced to avoid saving on every keystroke/move; flushed
+    // immediately by destroy() so nothing is lost on close.
     this.#saveTimer = setTimeout(() => this.#flushSave(), 300);
   }
 

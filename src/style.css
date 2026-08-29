@@ -1,5 +1,5 @@
-/* Module Ma Classe (ltn-classroom-layout) — styles autonomes, sans dépendance
-   à un site hôte. Préfixe de classe "cll-" pour éviter toute collision. */
+/* Ma Classe module (ltn-classroom-layout) — self-contained styles, no
+   dependency on a host site. Class prefix "cll-" to avoid collisions. */
 
 .cll-root {
   --cll-accent: #2f6f9e;
@@ -98,8 +98,9 @@
   pointer-events: none;
 }
 
-/* Bordures (tableau / porte / fenêtre) : fines bandes cliquables posées sur
-   les traits de la grille, invisibles tant qu'aucun objet n'y est posé. */
+/* Borders (tableau / porte / fenetre): clickable strips laid over the grid
+   lines, invisible until an object is placed there — see .cll-edge--set for
+   the badge shown once one is. */
 .cll-edge {
   position: absolute;
   z-index: 2;
@@ -110,12 +111,12 @@
 }
 
 .cll-edge--h {
-  height: 14px;
+  height: 26px;
   transform: translateY(-50%);
 }
 
 .cll-edge--v {
-  width: 14px;
+  width: 26px;
   transform: translateX(-50%);
 }
 
@@ -127,21 +128,51 @@
   background: transparent;
 }
 
+/* White badge behind a placed icon so it reads clearly against the dashed
+   grid lines and neighboring desks (large icon requested for visibility). */
 .cll-border-icon {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   overflow: visible;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 1px 4px rgba(0, 0, 0, 0.22);
 }
 
 .cll-border-icon-path {
   fill: none;
   stroke: var(--cll-accent);
-  stroke-width: 2.4;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-/* ---- Panneaux flottants (menu, couleur, élève, bordure) ---- */
+.cll-border-icon-fill {
+  fill: #eaf3f9;
+  stroke: var(--cll-accent);
+  stroke-width: 2;
+}
+
+.cll-border-icon-leaf {
+  stroke: var(--cll-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.cll-border-icon-arc {
+  fill: none;
+  stroke: var(--cll-accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 3 2.5;
+}
+
+.cll-border-icon-hinge {
+  fill: var(--cll-accent);
+}
+
+/* ---- Floating panels (menu, color, student, border) ---- */
 .cll-floating {
   z-index: 10060;
   background: #fff;
@@ -313,7 +344,7 @@
   background: rgba(47, 111, 158, 0.1);
 }
 
-/* ---- Toolbar (sous-titre + impression/export) ---- */
+/* ---- Toolbar (subtitle + print/export) ---- */
 .cll-toolbar {
   display: flex;
   align-items: center;
@@ -339,7 +370,7 @@
   white-space: nowrap;
 }
 
-/* ---- Impression ---- */
+/* ---- Print ---- */
 .cll-print-sheet {
   display: none;
 }
@@ -352,27 +383,39 @@
   .cll-print-sheet {
     display: block;
     width: 100%;
+    color: #2c3e50;
   }
 
+  /* Mirrors the "student list" PDF export banner already used elsewhere in
+     the host app: bold school/teacher row, dark rule, gray meta line. */
   .cll-print-header {
-    margin-bottom: 14px;
+    border-bottom: 2px solid #2c3e50;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
   }
 
-  .cll-print-teacher,
-  .cll-print-teacher-blank {
+  .cll-print-banner-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .cll-print-school,
+  .cll-print-teacher {
+    font-size: 15px;
     font-weight: 700;
-    font-size: 14px;
   }
 
-  .cll-print-teacher-blank {
-    color: #666;
-    font-weight: 400;
-  }
-
-  .cll-print-subtitle {
-    font-size: 12px;
-    color: #444;
+  .cll-print-meta {
+    font-size: 11px;
+    color: #566573;
     margin-top: 2px;
+  }
+
+  /* The dashed editing grid is a canvas aid, not part of the printed room
+     plan — only placed desks/objects should show up on paper. */
+  .cll-print-grid-host .cll-cell {
+    border: none;
   }
 
   .cll-print-grid-host .cll-edge:not(.cll-edge--set) {

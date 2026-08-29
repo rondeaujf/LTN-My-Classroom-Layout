@@ -29,8 +29,12 @@ export function openStudentPicker(
       panel.appendChild(removeBtn);
     }
 
+    // The teacher entry (isTeacher, cf. teacherStudentEntry in
+    // interactions.js) is exempt from the "one desk per roster id" rule: it
+    // stays pickable even after already being assigned elsewhere.
     const available = students.filter(
       (s) =>
+        s.isTeacher ||
         !s.id ||
         !assignedIds.has(s.id) ||
         (currentStudent && currentStudent.id === s.id),
@@ -53,8 +57,9 @@ export function openStudentPicker(
           )
           .forEach((s) => {
             const li = document.createElement("li");
-            li.textContent = s.level
-              ? `${studentLabel(s)} — ${s.level}`
+            const suffix = s.isTeacher ? "Enseignant" : s.level;
+            li.textContent = suffix
+              ? `${studentLabel(s)} — ${suffix}`
               : studentLabel(s);
             li.addEventListener("click", () => {
               close();

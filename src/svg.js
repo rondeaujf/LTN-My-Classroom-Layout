@@ -6,9 +6,9 @@ function el(tag, attrs) {
   return node;
 }
 
-// Bureau vu de dessus, chaise contre le bord "sud" (avant rotation). La
-// rotation du bureau tourne ce SVG entier via CSS ; le texte élève est
-// rendu séparément par-dessus pour rester toujours lisible (cf. render.js).
+// Desk seen from above, chair against the "south" edge (before rotation).
+// Desk rotation spins this whole SVG via CSS; the student label is rendered
+// separately on top so it stays readable at any rotation (see render.js).
 export function buildDeskSvg({ occupied }) {
   const svg = el("svg", {
     viewBox: "0 0 100 100",
@@ -50,10 +50,112 @@ export function buildDeskSvg({ occupied }) {
   return svg;
 }
 
-const BORDER_ICON_PATHS = {
-  tableau: "M6 8h20v12H6zM10 20v3M22 20v3M8 23h16", // tableau + pieds
-  porte: "M6 4h16v24H6zM6 16h2", // porte + poignée
-  fenetre: "M4 4h24v24H4zM16 4v24M4 16h24", // fenêtre à croisillons
+// Board (whiteboard on an easel), viewed face-on.
+function buildTableauIcon(g) {
+  g.appendChild(
+    el("rect", {
+      x: 4,
+      y: 6,
+      width: 24,
+      height: 15,
+      rx: 1.5,
+      class: "cll-border-icon-fill",
+    }),
+  );
+  g.appendChild(
+    el("line", { x1: 9, y1: 21, x2: 6, y2: 27, class: "cll-border-icon-path" }),
+  );
+  g.appendChild(
+    el("line", {
+      x1: 23,
+      y1: 21,
+      x2: 26,
+      y2: 27,
+      class: "cll-border-icon-path",
+    }),
+  );
+  g.appendChild(
+    el("line", {
+      x1: 6,
+      y1: 27,
+      x2: 26,
+      y2: 27,
+      class: "cll-border-icon-path",
+    }),
+  );
+}
+
+// Window with a 4-pane cross divider.
+function buildFenetreIcon(g) {
+  g.appendChild(
+    el("rect", {
+      x: 4,
+      y: 4,
+      width: 24,
+      height: 24,
+      rx: 1,
+      class: "cll-border-icon-fill",
+    }),
+  );
+  g.appendChild(
+    el("line", {
+      x1: 16,
+      y1: 4,
+      x2: 16,
+      y2: 28,
+      class: "cll-border-icon-path",
+    }),
+  );
+  g.appendChild(
+    el("line", {
+      x1: 4,
+      y1: 16,
+      x2: 28,
+      y2: 16,
+      class: "cll-border-icon-path",
+    }),
+  );
+}
+
+// Door ajar (standard architectural swing symbol): a baseline for the wall
+// opening, a hinge dot at one end, the leaf swung open at ~55°, and a
+// dashed arc tracing its sweep from the closed (flat) position to the open
+// one. Rotation (0/180, cf. rotateBorderAt in src/model.js) flips which
+// side it opens from.
+function buildPorteIcon(g) {
+  g.appendChild(
+    el("line", {
+      x1: 4,
+      y1: 26,
+      x2: 28,
+      y2: 26,
+      class: "cll-border-icon-path",
+    }),
+  );
+  g.appendChild(
+    el("path", {
+      d: "M26 26 A20 20 0 0 0 17.5 9.6",
+      class: "cll-border-icon-arc",
+    }),
+  );
+  g.appendChild(
+    el("line", {
+      x1: 6,
+      y1: 26,
+      x2: 17.5,
+      y2: 9.6,
+      class: "cll-border-icon-leaf",
+    }),
+  );
+  g.appendChild(
+    el("circle", { cx: 6, cy: 26, r: 1.8, class: "cll-border-icon-hinge" }),
+  );
+}
+
+const ICON_BUILDERS = {
+  tableau: buildTableauIcon,
+  porte: buildPorteIcon,
+  fenetre: buildFenetreIcon,
 };
 
 export function buildBorderIcon(type) {
@@ -62,8 +164,6 @@ export function buildBorderIcon(type) {
     class: `cll-border-icon cll-border-icon--${type}`,
     "aria-hidden": "true",
   });
-  svg.appendChild(
-    el("path", { d: BORDER_ICON_PATHS[type], class: "cll-border-icon-path" }),
-  );
+  ICON_BUILDERS[type](svg);
   return svg;
 }

@@ -9,6 +9,7 @@ import {
   unassignStudentAt,
   setBorderAt,
   clearBorderAt,
+  rotateBorderAt,
   fitGridToContentWithRing,
   serializeState,
   deserializeState,
@@ -18,7 +19,7 @@ import {
 } from "../src/model.js";
 
 describe("toggleDeskAt", () => {
-  it("place un bureau vide sur une case vide", () => {
+  it("places an empty desk on an empty cell", () => {
     const state = toggleDeskAt(createEmptyState(), 2, 3);
     expect(state.cells[cellKey(2, 3)]).toEqual({
       type: "desk",
@@ -28,27 +29,27 @@ describe("toggleDeskAt", () => {
     });
   });
 
-  it("retire l'élève d'abord, puis le bureau au second clic", () => {
+  it("removes the student first, then the desk on the second click", () => {
     let state = toggleDeskAt(createEmptyState(), 1, 1);
     state = assignStudentAt(state, 1, 1, { name: "Ada" });
-    state = toggleDeskAt(state, 1, 1); // 1er clic sur bureau occupé
+    state = toggleDeskAt(state, 1, 1); // 1st click on an occupied desk
     expect(state.cells[cellKey(1, 1)].student).toBeNull();
     expect(state.cells[cellKey(1, 1)]).toBeDefined();
 
-    state = toggleDeskAt(state, 1, 1); // 2e clic : bureau vide -> supprimé
+    state = toggleDeskAt(state, 1, 1); // 2nd click: empty desk -> removed
     expect(state.cells[cellKey(1, 1)]).toBeUndefined();
   });
 });
 
 describe("removeDeskAt / rotateDeskAt / setDeskColorAt", () => {
-  it("supprime un bureau existant, ignore une case vide", () => {
+  it("removes an existing desk, is a no-op on an empty cell", () => {
     let state = toggleDeskAt(createEmptyState(), 0, 0);
     state = removeDeskAt(state, 0, 0);
     expect(state.cells[cellKey(0, 0)]).toBeUndefined();
-    expect(removeDeskAt(state, 5, 5)).toBe(state); // no-op, même référence
+    expect(removeDeskAt(state, 5, 5)).toBe(state); // no-op, same reference
   });
 
-  it("fait tourner le bureau par pas de 90°, boucle à 360", () => {
+  it("rotates the desk in 90° steps, wraps at 360", () => {
     let state = toggleDeskAt(createEmptyState(), 0, 0);
     state = rotateDeskAt(state, 0, 0);
     expect(state.cells[cellKey(0, 0)].rotation).toBe(90);
@@ -56,7 +57,7 @@ describe("removeDeskAt / rotateDeskAt / setDeskColorAt", () => {
     expect(state.cells[cellKey(0, 0)].rotation).toBe(0);
   });
 
-  it("applique une couleur", () => {
+  it("applies a color", () => {
     let state = toggleDeskAt(createEmptyState(), 0, 0);
     state = setDeskColorAt(state, 0, 0, "#ff000080");
     expect(state.cells[cellKey(0, 0)].color).toBe("#ff000080");
@@ -64,18 +65,18 @@ describe("removeDeskAt / rotateDeskAt / setDeskColorAt", () => {
 });
 
 describe("assignStudentAt / unassignStudentAt", () => {
-  it("crée le bureau si besoin en affectant un élève", () => {
+  it("creates the desk if needed when assigning a student", () => {
     const state = assignStudentAt(createEmptyState(), 4, 4, {
-      name: "Zoé",
-      level: "CE2",
+      name: "Zoe",
+      level: "Grade 3",
     });
     expect(state.cells[cellKey(4, 4)].student).toEqual({
-      name: "Zoé",
-      level: "CE2",
+      name: "Zoe",
+      level: "Grade 3",
     });
   });
 
-  it("désaffecte sans supprimer le bureau", () => {
+  it("unassigns without removing the desk", () => {
     let state = assignStudentAt(createEmptyState(), 0, 0, { name: "X" });
     state = unassignStudentAt(state, 0, 0);
     expect(state.cells[cellKey(0, 0)].student).toBeNull();
@@ -83,23 +84,36 @@ describe("assignStudentAt / unassignStudentAt", () => {
   });
 });
 
-describe("bordures", () => {
-  it("pose puis retire une bordure", () => {
+describe("borders", () => {
+  it("places then removes a border", () => {
     let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "porte");
-    expect(state.edges[hEdgeKey(0, 2)]).toEqual({ type: "porte" });
+    expect(state.edges[hEdgeKey(0, 2)]).toEqual({
+      type: "porte",
+      rotation: 0,
+    });
     state = clearBorderAt(state, hEdgeKey(0, 2));
     expect(state.edges[hEdgeKey(0, 2)]).toBeUndefined();
   });
 
-  it("refuse un type de bordure inconnu", () => {
+  it("rejects an unknown border type", () => {
     expect(() =>
-      setBorderAt(createEmptyState(), vEdgeKey(0, 0), "canape"),
+      setBorderAt(createEmptyState(), vEdgeKey(0, 0), "sofa"),
     ).toThrow();
+  });
+
+  it("flips a door's opening side (rotation 0 <-> 180), is a no-op without a border", () => {
+    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "porte");
+    state = rotateBorderAt(state, hEdgeKey(0, 2));
+    expect(state.edges[hEdgeKey(0, 2)].rotation).toBe(180);
+    state = rotateBorderAt(state, hEdgeKey(0, 2));
+    expect(state.edges[hEdgeKey(0, 2)].rotation).toBe(0);
+
+    expect(rotateBorderAt(state, vEdgeKey(9, 9))).toBe(state);
   });
 });
 
 describe("fitGridToContentWithRing", () => {
-  it("garde la grille par défaut quand rien n'est posé", () => {
+  it("keeps the default grid when nothing is placed", () => {
     const state = fitGridToContentWithRing(createEmptyState(), {
       cols: 5,
       rows: 6,
@@ -107,38 +121,38 @@ describe("fitGridToContentWithRing", () => {
     expect(state.grid).toEqual({ cols: 5, rows: 6 });
   });
 
-  it("resserre la grille au contenu + une couronne, et réindexe", () => {
+  it("shrinks the grid to content + one ring, and reindexes", () => {
     let state = createEmptyState({ cols: 5, rows: 6 });
-    state = toggleDeskAt(state, 2, 3); // seul bureau du plan
+    state = toggleDeskAt(state, 2, 3); // the plan's only desk
     const fitted = fitGridToContentWithRing(state);
 
-    // bounding box = {2,3}..{2,3} -> +1 couronne de chaque côté = 3x3
+    // bounding box = {2,3}..{2,3} -> +1 ring on every side = 3x3
     expect(fitted.grid).toEqual({ cols: 3, rows: 3 });
-    // le bureau doit désormais être au centre (1,1) de la nouvelle grille
+    // the desk should now sit at the center (1,1) of the new grid
     expect(fitted.cells[cellKey(1, 1)]).toBeDefined();
     expect(fitted.cells[cellKey(2, 3)]).toBeUndefined();
   });
 
-  it("inclut les bordures dans le calcul de l'emprise", () => {
+  it("includes borders in the bounding-box computation", () => {
     let state = createEmptyState({ cols: 5, rows: 6 });
-    state = setBorderAt(state, vEdgeKey(4, 4), "fenetre"); // bord droit, ligne 4 = hors grille de base
+    state = setBorderAt(state, vEdgeKey(4, 4), "fenetre"); // right edge, line 4 = outside the base grid
     const fitted = fitGridToContentWithRing(state);
-    // row 4, col line 4 -> extent col [3,4], row [4,4]; +couronne -> couvre bien la bordure
+    // row 4, col line 4 -> col extent [3,4], row extent [4,4]; +ring -> the border is covered
     const remapped = Object.keys(fitted.edges)[0];
     expect(remapped).toBeDefined();
   });
 });
 
 describe("serialize / deserialize", () => {
-  it("round-trip", () => {
+  it("round-trips", () => {
     let state = toggleDeskAt(createEmptyState(), 1, 1);
-    state = assignStudentAt(state, 1, 1, { name: "Léo", level: "CP" });
+    state = assignStudentAt(state, 1, 1, { name: "Leo", level: "Grade 1" });
     const json = serializeState(state);
     const back = deserializeState(json);
     expect(back).toEqual(state);
   });
 
-  it("comble les champs manquants d'un JSON incomplet", () => {
+  it("fills in missing fields from an incomplete JSON", () => {
     const back = deserializeState("{}");
     expect(back.grid).toEqual({ cols: 5, rows: 6 });
     expect(back.cells).toEqual({});

@@ -8,11 +8,16 @@ import {
   unassignStudentAt,
   setBorderAt,
   clearBorderAt,
+  rotateBorderAt,
 } from "./model.js";
 import { openContextMenu } from "./menu.js";
 import { openColorPicker } from "./colorPicker.js";
 import { openStudentPicker } from "./studentPicker.js";
 import { openBorderPicker } from "./borderPicker.js";
+
+// Stable id for the "teacher" entry synthesized from `options.teacher` (see
+// teacherStudentEntry below). Never collides with a real roster id.
+const TEACHER_STUDENT_ID = "__teacher__";
 
 function assignedStudentIds(state) {
   const ids = new Set();
@@ -22,6 +27,17 @@ function assignedStudentIds(state) {
   return ids;
 }
 
+// If the host app documented a teacher (options.teacher), the teacher can
+// also be assigned to a desk — one or several, that's the one exception to
+// the "each roster student appears once" rule (cf. isTeacher handling in
+// studentPicker.js).
+function teacherStudentEntry(teacher) {
+  if (!teacher) return null;
+  const name = [teacher.firstName, teacher.lastName].filter(Boolean).join(" ");
+  if (!name) return null;
+  return { id: TEACHER_STUDENT_ID, name, isTeacher: true };
+}
+
 function handleCellClick(row, col, ctx) {
   ctx.applyChange((state) => toggleDeskAt(state, row, col));
 }
@@ -29,8 +45,12 @@ function handleCellClick(row, col, ctx) {
 function openAssignPopup(x, y, row, col, ctx) {
   const state = ctx.getState();
   const cell = state.cells[cellKey(row, col)];
+  const teacherEntry = teacherStudentEntry(ctx.options.teacher);
+  const students = teacherEntry
+    ? [teacherEntry, ...(ctx.options.students ?? [])]
+    : (ctx.options.students ?? []);
   openStudentPicker(x, y, {
-    students: ctx.options.students ?? [],
+    students,
     assignedIds: assignedStudentIds(state),
     currentStudent: cell?.student ?? null,
     onAssign: (student) =>
@@ -105,10 +125,37 @@ function handleEdgeClick(x, y, edgeKey, ctx) {
   });
 }
 
+function openEdgeContextMenu(x, y, edgeKey, ctx) {
+  const state = ctx.getState();
+  const edge = state.edges[edgeKey];
+
+  if (!edge) {
+    openBorderPicker(x, y, {
+      onPick: (type) => ctx.applyChange((s) => setBorderAt(s, edgeKey, type)),
+    });
+    return;
+  }
+
+  const items = [];
+  // Rotation only makes a visible difference for a door (which side it
+  // swings open from) — tableau/fenetre icons are symmetric under 180°.
+  if (edge.type === "porte") {
+    items.push({
+      label: "Changer le sens d'ouverture",
+      onSelect: () => ctx.applyChange((s) => rotateBorderAt(s, edgeKey)),
+    });
+  }
+  items.push({
+    label: "Supprimer",
+    onSelect: () => ctx.applyChange((s) => clearBorderAt(s, edgeKey)),
+  });
+  openContextMenu(x, y, items);
+}
+
 /**
- * Câble les interactions sur la grille déjà rendue. `ctx.applyChange(fn)`
- * doit appliquer `fn` à l'état courant, re-rendre et persister — fourni par
- * l'instance ClassroomLayout (src/index.js).
+ * Wires up interactions on an already-rendered grid. `ctx.applyChange(fn)`
+ * must apply `fn` to the current state, re-render and persist — supplied
+ * by the ClassroomLayout instance (src/index.js).
  */
 export function attachInteractions(gridEl, ctx) {
   const onClick = (e) => {
@@ -124,6 +171,12 @@ export function attachInteractions(gridEl, ctx) {
   };
 
   const onContextMenu = (e) => {
+    const edge = e.target.closest(".cll-edge");
+    if (edge) {
+      e.preventDefault();
+      openEdgeContextMenu(e.clientX, e.clientY, edge.dataset.edgeKey, ctx);
+      return;
+    }
     const cell = e.target.closest(".cll-cell");
     if (!cell) return;
     e.preventDefault();

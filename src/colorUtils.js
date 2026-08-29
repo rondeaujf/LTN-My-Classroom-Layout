@@ -1,5 +1,5 @@
-// Une couleur de bureau est stockée sous forme "#rrggbb" (opaque) ou
-// "rgba(r, g, b, a)" (avec transparence) — cf. README, section "Couleurs".
+// A desk color is stored as "#rrggbb" (opaque) or "rgba(r, g, b, a)" (with
+// transparency) — see README, "Colors" section.
 
 export function toHex6(color) {
   if (!color) return "#eef1f4";

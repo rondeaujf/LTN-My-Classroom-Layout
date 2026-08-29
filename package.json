@@ -1,7 +1,7 @@
 {
   "name": "ltn-classroom-layout",
   "version": "0.1.0",
-  "description": "Module autonome (vanilla JS, sans dépendance framework) de plan de classe interactif : grille de bureaux, rotation/couleur, affectation d'élèves, objets de bordure (tableau/porte/fenêtre), export impression.",
+  "description": "Standalone vanilla JS module for an interactive classroom seating chart: desk grid, rotation/color, student assignment, border objects (board/door/window), print export.",
   "type": "module",
   "main": "src/index.js",
   "module": "src/index.js",

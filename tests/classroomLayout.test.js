@@ -13,7 +13,7 @@ describe("ClassroomLayout", () => {
     document.body.appendChild(container);
   });
 
-  it("démarre sur une grille 5x6 vide par défaut", async () => {
+  it("starts on an empty 5x6 grid by default", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     const cells = container.querySelectorAll(".cll-cell");
@@ -21,7 +21,7 @@ describe("ClassroomLayout", () => {
     expect(container.querySelectorAll(".cll-cell--desk").length).toBe(0);
   });
 
-  it("charge et redimensionne (couronne) la configuration persistée", async () => {
+  it("loads and resizes (ring) the persisted configuration", async () => {
     const load = vi.fn().mockResolvedValue({
       version: 1,
       grid: { cols: 5, rows: 6 },
@@ -42,7 +42,7 @@ describe("ClassroomLayout", () => {
     expect(container.querySelectorAll(".cll-cell--desk").length).toBe(1);
   });
 
-  it("clic sur une case vide crée un bureau, reclic le supprime", async () => {
+  it("clicking an empty cell creates a desk, clicking it again removes it", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     const firstCell = container.querySelector(".cll-cell");
@@ -54,7 +54,7 @@ describe("ClassroomLayout", () => {
     expect(container.querySelectorAll(".cll-cell--desk").length).toBe(0);
   });
 
-  it("clic sur un bureau occupé retire l'élève avant de retirer le bureau", async () => {
+  it("clicking an occupied desk removes the student before removing the desk", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     layout.applyChange((s) => ({
@@ -69,9 +69,9 @@ describe("ClassroomLayout", () => {
       },
     }));
 
-    // Requête refaite après chaque clic : renderGrid reconstruit tout le DOM
-    // de la grille à chaque changement d'état (cf. render.js), donc toute
-    // référence à un nœud d'avant le rendu précédent est obsolète.
+    // Re-queried after each click: renderGrid rebuilds the whole grid DOM on
+    // every state change (see render.js), so any node reference from before
+    // the previous render is stale.
     click(container.querySelector('[data-row="0"][data-col="0"]'));
     expect(layout.getState().cells["0_0"].student).toBeNull();
     expect(layout.getState().cells["0_0"]).toBeDefined();
@@ -80,7 +80,7 @@ describe("ClassroomLayout", () => {
     expect(layout.getState().cells["0_0"]).toBeUndefined();
   });
 
-  it("planifie une sauvegarde (debounce) et la flush à la destruction", async () => {
+  it("schedules a debounced save and flushes it on destroy", async () => {
     vi.useFakeTimers();
     const save = vi.fn();
     const layout = new ClassroomLayout(container, { persistence: { save } });
@@ -95,7 +95,7 @@ describe("ClassroomLayout", () => {
     vi.useRealTimers();
   });
 
-  it("ouvre un menu contextuel sur clic droit d'un bureau", async () => {
+  it("opens a context menu on right-click of a desk", async () => {
     const layout = new ClassroomLayout(container);
     await layout.ready;
     layout.applyChange((s) => ({
@@ -112,5 +112,87 @@ describe("ClassroomLayout", () => {
     expect(items).toContain("Affecter un élève…");
     expect(items).toContain("Faire pivoter (90°)");
     expect(items).toContain("Supprimer le bureau");
+  });
+
+  it("lets the documented teacher be assigned to more than one desk", async () => {
+    const layout = new ClassroomLayout(container, {
+      teacher: { firstName: "Jean", lastName: "Dupont" },
+    });
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": { type: "desk", rotation: 0, color: null, student: null },
+        "0_1": { type: "desk", rotation: 0, color: null, student: null },
+      },
+    }));
+
+    click(
+      container.querySelector('[data-row="0"][data-col="0"]'),
+      "contextmenu",
+    );
+    click(document.querySelector(".cll-menu-item"));
+    click(document.querySelector(".cll-student-list li"));
+    expect(layout.getState().cells["0_0"].student).toEqual({
+      id: "__teacher__",
+      name: "Jean Dupont",
+      level: undefined,
+    });
+
+    // Still offered for a second desk: the roster-uniqueness rule doesn't
+    // apply to the teacher entry.
+    click(
+      container.querySelector('[data-row="0"][data-col="1"]'),
+      "contextmenu",
+    );
+    click(document.querySelector(".cll-menu-item"));
+    expect(document.querySelector(".cll-student-list li")).not.toBeNull();
+  });
+
+  it("right-clicking an empty border offers the tableau/porte/fenetre choice", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const edge = container.querySelector('.cll-edge[data-edge-key="h_0_0"]');
+    click(edge, "contextmenu");
+    expect(document.querySelectorAll(".cll-borderpicker-btn").length).toBe(3);
+  });
+
+  it("lets a door's opening side be flipped from its right-click menu", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      edges: { h_0_0: { type: "porte", rotation: 0 } },
+    }));
+
+    click(
+      container.querySelector('.cll-edge[data-edge-key="h_0_0"]'),
+      "contextmenu",
+    );
+    const items = Array.from(document.querySelectorAll(".cll-menu-item")).map(
+      (li) => li.textContent,
+    );
+    expect(items).toEqual(["Changer le sens d'ouverture", "Supprimer"]);
+
+    click(document.querySelector(".cll-menu-item"));
+    expect(layout.getState().edges.h_0_0.rotation).toBe(180);
+  });
+
+  it("only offers Supprimer for a non-door border (tableau/fenetre are symmetric)", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      edges: { h_0_0: { type: "tableau", rotation: 0 } },
+    }));
+
+    click(
+      container.querySelector('.cll-edge[data-edge-key="h_0_0"]'),
+      "contextmenu",
+    );
+    const items = Array.from(document.querySelectorAll(".cll-menu-item")).map(
+      (li) => li.textContent,
+    );
+    expect(items).toEqual(["Supprimer"]);
   });
 });
