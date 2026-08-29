@@ -103,12 +103,19 @@ function el(tag, { className, attrs, text } = {}) {
   return node;
 }
 
-// Shrinks the font size until the name fits on one line without
-// overflowing the desk (spec requirement: "max size, never overflowing").
+// Shrinks the font size until the name fits — wrapping onto multiple lines
+// is fine (see .cll-desk-name, style.css), so it's scrollHeight (against
+// max-height) that matters once wrapped, not scrollWidth (bounded by
+// max-width, which just controls *where* it wraps) — but a name with no
+// wrap opportunity at all (one long word) can still overflow width too.
 function fitText(node, { max = 15, min = 7 } = {}) {
   let size = max;
   node.style.fontSize = `${size}px`;
-  while (size > min && node.scrollWidth > node.clientWidth) {
+  while (
+    size > min &&
+    (node.scrollWidth > node.clientWidth ||
+      node.scrollHeight > node.clientHeight)
+  ) {
     size -= 1;
     node.style.fontSize = `${size}px`;
   }

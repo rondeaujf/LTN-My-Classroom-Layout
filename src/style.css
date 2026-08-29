@@ -78,14 +78,20 @@
 
 /* top and transform (translate + counter-rotation) are set inline per-desk,
    see render.js — anchored at the desk-top rect's own true local center, so
-   it stays centered on the plateau at every rotation ("stuck" included). */
+   it stays centered on the plateau at every rotation ("stuck" included).
+   Wraps onto multiple lines rather than clip a long name; fitText (see
+   render.js) shrinks the font if it still overflows the desk. z-index lifts
+   it above a neighboring desk (edge-to-edge, no gap — see .cll-desk) that
+   would otherwise paint over it purely by later DOM order. */
 .cll-desk-name {
   position: absolute;
   left: 50%;
+  z-index: 3;
   max-width: 78%;
+  max-height: 46%;
   font-weight: 700;
   text-align: center;
-  white-space: nowrap;
+  line-height: 1.15;
   overflow: hidden;
   pointer-events: none;
   color: #1c2b33;
@@ -93,9 +99,11 @@
 
 /* top/left are set inline per-desk, see render.js (positionLevelBadge) —
    the badge always reads top-left from the viewer's point of view, whatever
-   the desk's rotation, so its actual local anchor corner varies. */
+   the desk's rotation, so its actual local anchor corner varies. z-index:
+   see .cll-desk-name above. */
 .cll-desk-level {
   position: absolute;
+  z-index: 3;
   font-size: 10px;
   font-weight: 600;
   color: #55707f;
