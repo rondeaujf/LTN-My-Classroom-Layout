@@ -71,7 +71,17 @@ export function openStudentPicker(
                 : studentLabel(s);
               li.addEventListener("click", () => {
                 close();
-                onAssign({ id: s.id, name: studentLabel(s), level: s.level });
+                // firstName/lastName kept separate (not collapsed via the
+                // studentLabel() above, which is only for this list's own
+                // display) so a desk can be shown first-name-only/last-name
+                // -only (options.nameDisplay, src/render.js) once assigned.
+                onAssign({
+                  id: s.id,
+                  firstName: s.firstName,
+                  lastName: s.lastName,
+                  name: s.name,
+                  level: s.level,
+                });
               });
               list.appendChild(li);
             });

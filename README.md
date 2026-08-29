@@ -104,12 +104,14 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   app's logo centered at the bottom, mirroring the site's other PDF
   exports. The editing grid's dashed guide lines are not printed, only the
   placed desks and border objects are, and the grid itself is cropped to
-  content + one ring (see "Loading and the empty ring" below) — the live
-  editing grid can be much bigger than its actual content, and printing all
-  of it would waste most of the page on empty margin instead of a bigger
-  room plan; the editing state itself is untouched. A host app can take
-  over entirely with `options.onPrint` (e.g. to render its own PDF from
-  `buildPrintSheet()` instead of the browser dialog).
+  content with no padding ring (unlike the load-time fit, see "Loading and
+  the empty ring" below, which keeps one so live editing can still extend
+  the room) — the live editing grid can be much bigger than its actual
+  content, and printing all of it would waste most of the page on empty
+  margin instead of a bigger room plan; the editing state itself is
+  untouched. A host app can take over entirely with `options.onPrint` (e.g.
+  to render its own PDF from `buildPrintSheet()` instead of the browser
+  dialog).
 
 Every change is applied immediately to the state and triggers
 `options.persistence.save` (lightly debounced, then always flushed on
@@ -124,21 +126,40 @@ saved configuration, the grid is recomputed as the smallest rectangle
 containing all the content (desks + borders), surrounded by a one-cell empty
 ring — not pinned to 5×6.
 
+## Sizing (always-square cells)
+
+The grid is sized in JS, not just CSS (`fitGridToHost`, `src/render.js`): on
+every render, and on every resize of its own container (`.cll-grid-host`,
+a `ResizeObserver`), it's set to the largest square-celled box that fits
+that container — CSS `aspect-ratio` alone can't reliably give way on
+whichever axis turns out to be the scarcer one once a host app's own layout
+reshapes the container to something other than the grid's own cols:rows
+ratio (a resized dialog, e.g.), and a non-square cell distorts the SVG
+icons drawn into it (`preserveAspectRatio="none"`, see `buildBorderIcon`,
+`src/svg.js`) — most visibly a door's swing arc.
+
+A host app just needs to give `.cll-grid-host` a real box to fit into (e.g.
+`flex: 1; min-height: 0;` down a height-constrained flex column, for a
+dialog whose height is the scarce dimension) — nothing else, no
+width/height/aspect-ratio tricks of its own.
+
 ## API
 
 ### `new ClassroomLayout(container, options?)`
 
-| Option        | Type                                                         | Description                                                                                                                                                                                                                                                                                 |
-| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gridDefault` | `{cols, rows}`                                               | Initial grid when no configuration is loaded (default `{cols:5, rows:6}`).                                                                                                                                                                                                                  |
-| `students`    | `Array<{id?, firstName?, lastName?, name?, level?, group?}>` | Optional list offered when assigning a student.                                                                                                                                                                                                                                             |
-| `colors`      | `Array<string \| {label?, value}>`                           | Optional preferred colors (site colors, subject colors…).                                                                                                                                                                                                                                   |
-| `teacher`     | `{firstName?, lastName?, className?, school?, year?}`        | Optional teacher info, shown in the print header. If absent, the print header fields are left blank for the teacher to fill in by hand, and the teacher entry above the roster doesn't appear.                                                                                              |
-| `persistence` | `{load(), save(state)}`                                      | Persistence adapter supplied by the host app (`load` can be async; `save` receives the full state). Without it, nothing is loaded/saved — the host app manages `getState()`/`setState()` itself.                                                                                            |
-| `onChange`    | `(state) => void`                                            | Optional callback invoked after every change.                                                                                                                                                                                                                                               |
-| `onPrint`     | `(state, {teacher, logoUrl}) => void`                        | Optional override for `layout.print()` — if supplied, called instead of opening the browser's print dialog (e.g. to render a PDF from `buildPrintSheet()` and show it however the host app displays PDFs).                                                                                  |
-| `logoUrl`     | `string`                                                     | Optional host-app logo URL, shown centered at the bottom of the print/PDF sheet (mirrors the site's other PDF exports).                                                                                                                                                                     |
-| `nameFit`     | `{max?, min?}`                                               | Bounds (px) for the automatic size-down of the student name shown on the desk. `max` (default `12`) is a fixed standard size, not a per-name ceiling — a short name never renders larger than it, only ever shrinking below it (down to `min`, default `7`) when it wouldn't otherwise fit. |
+| Option        | Type                                                          | Description                                                                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gridDefault` | `{cols, rows}`                                                | Initial grid when no configuration is loaded (default `{cols:5, rows:6}`).                                                                                                                                                                                                                  |
+| `students`    | `Array<{id?, firstName?, lastName?, name?, level?, group?}>`  | Optional list offered when assigning a student.                                                                                                                                                                                                                                             |
+| `colors`      | `Array<string \| {label?, value}>`                            | Optional preferred colors (site colors, subject colors…).                                                                                                                                                                                                                                   |
+| `teacher`     | `{firstName?, lastName?, className?, school?, year?}`         | Optional teacher info, shown in the print header. If absent, the print header fields are left blank for the teacher to fill in by hand, and the teacher entry above the roster doesn't appear.                                                                                              |
+| `persistence` | `{load(), save(state)}`                                       | Persistence adapter supplied by the host app (`load` can be async; `save` receives the full state). Without it, nothing is loaded/saved — the host app manages `getState()`/`setState()` itself.                                                                                            |
+| `onChange`    | `(state) => void`                                             | Optional callback invoked after every change.                                                                                                                                                                                                                                               |
+| `onPrint`     | `(state, {teacher, logoUrl, showLevel, nameDisplay}) => void` | Optional override for `layout.print()` — if supplied, called instead of opening the browser's print dialog (e.g. to render a PDF from `buildPrintSheet()` and show it however the host app displays PDFs).                                                                                  |
+| `logoUrl`     | `string`                                                      | Optional host-app logo URL, shown centered at the bottom of the print/PDF sheet (mirrors the site's other PDF exports).                                                                                                                                                                     |
+| `nameFit`     | `{max?, min?}`                                                | Bounds (px) for the automatic size-down of the student name shown on the desk. `max` (default `12`) is a fixed standard size, not a per-name ceiling — a short name never renders larger than it, only ever shrinking below it (down to `min`, default `7`) when it wouldn't otherwise fit. |
+| `showLevel`   | `boolean`                                                     | Whether to show the student's level badge on the desk (default `true`).                                                                                                                                                                                                                     |
+| `nameDisplay` | `"full" \| "firstName" \| "lastName"`                         | Which part of the student's name to show on the desk (default `"full"`). Falls back to the full name for a roster entry that only has a pre-joined `name` (no `firstName`/`lastName` split to draw just one part from).                                                                     |
 
 ### Methods
 

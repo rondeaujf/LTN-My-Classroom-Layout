@@ -4,7 +4,7 @@ import {
   deserializeState,
   setSubtitle,
 } from "./model.js";
-import { renderGrid } from "./render.js";
+import { renderGrid, fitGridToHost } from "./render.js";
 import { attachInteractions } from "./interactions.js";
 import { printLayout } from "./print.js";
 
@@ -20,6 +20,7 @@ export class ClassroomLayout {
   #options;
   #detachInteractions;
   #saveTimer;
+  #resizeObserver;
 
   /**
    * @param {string|Element} container
@@ -30,8 +31,10 @@ export class ClassroomLayout {
    * @param {{firstName?, lastName?, className?, school?, year?}} [options.teacher]
    * @param {{load(): any, save(state): void}} [options.persistence] persistence adapter supplied by the host app
    * @param {(state) => void} [options.onChange]
-   * @param {(state, {teacher}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl}) and show it however the host app displays PDFs
+   * @param {(state, {teacher, logoUrl, showLevel, nameDisplay}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl, showLevel, nameDisplay}) and show it however the host app displays PDFs
    * @param {string} [options.logoUrl] optional host-app logo, shown at the bottom of the print/PDF sheet (mirrors the site's other PDF exports)
+   * @param {boolean} [options.showLevel] whether to show the student's level badge on the desk (default true)
+   * @param {"full"|"firstName"|"lastName"} [options.nameDisplay] which part of the student's name to show on the desk (default "full")
    */
   constructor(container, options = {}) {
     this.#container =
@@ -71,9 +74,21 @@ export class ClassroomLayout {
     toolbar.append(this.#subtitleInput, printBtn);
 
     this.#gridHost = document.createElement("div");
+    this.#gridHost.className = "cll-grid-host";
 
     this.#root.append(toolbar, this.#gridHost);
     this.#container.appendChild(this.#root);
+
+    // Re-fits the grid (fitGridToHost, src/render.js) whenever the host's
+    // own box changes shape — a state change already re-fits as part of
+    // #render(), but the host can just as well be reshaped on its own
+    // (e.g. the user resizing a host app's dialog) without the state
+    // changing at all.
+    this.#resizeObserver = new ResizeObserver(() => {
+      const grid = this.#gridHost.querySelector(".cll-grid");
+      if (grid) fitGridToHost(this.#gridHost, grid);
+    });
+    this.#resizeObserver.observe(this.#gridHost);
   }
 
   async #load() {
@@ -96,6 +111,8 @@ export class ClassroomLayout {
   #render() {
     const gridEl = renderGrid(this.#gridHost, this.#state, {
       nameFit: this.#options.nameFit,
+      showLevel: this.#options.showLevel,
+      nameDisplay: this.#options.nameDisplay,
     });
     this.#detachInteractions?.();
     this.#detachInteractions = attachInteractions(gridEl, {
@@ -141,13 +158,22 @@ export class ClassroomLayout {
   print() {
     const teacher = this.#options.teacher ?? this.#state.teacherOverride;
     const logoUrl = this.#options.logoUrl;
+    const showLevel = this.#options.showLevel;
+    const nameDisplay = this.#options.nameDisplay;
     if (this.#options.onPrint) {
-      this.#options.onPrint(this.getState(), { teacher, logoUrl });
+      this.#options.onPrint(this.getState(), {
+        teacher,
+        logoUrl,
+        showLevel,
+        nameDisplay,
+      });
       return;
     }
     printLayout(this.#state, {
       teacher,
       logoUrl,
+      showLevel,
+      nameDisplay,
       editableTeacherInputs: !this.#options.teacher,
     });
   }
@@ -155,6 +181,7 @@ export class ClassroomLayout {
   destroy() {
     this.#flushSave();
     this.#detachInteractions?.();
+    this.#resizeObserver?.disconnect();
     this.#container.replaceChildren();
   }
 }

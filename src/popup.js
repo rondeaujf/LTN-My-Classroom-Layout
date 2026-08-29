@@ -32,6 +32,32 @@ export function resolveHost(anchorEl) {
   return anchorEl?.closest?.("dialog[open]") ?? document.body;
 }
 
+/**
+ * Pure positioning math for openFloating's post-render overflow check —
+ * exported for unit testing (see tests/popup.test.js): jsdom has no real
+ * layout engine, so the actual DOM integration can only ever exercise this
+ * with all-zero rects, never a real overflow case. Flips past the near
+ * edge to clear a far edge it overflows (right/bottom), then clamps to 0 —
+ * flipping to clear one edge can itself push the panel past the opposite
+ * one, for a panel wider/taller than the available box.
+ */
+export function clampFloatingPosition({
+  left,
+  top,
+  rectRight,
+  rectBottom,
+  panelWidth,
+  panelHeight,
+  boundRight,
+  boundBottom,
+}) {
+  let clampedLeft = left;
+  let clampedTop = top;
+  if (rectRight > boundRight) clampedLeft -= panelWidth;
+  if (rectBottom > boundBottom) clampedTop -= panelHeight;
+  return { left: Math.max(clampedLeft, 0), top: Math.max(clampedTop, 0) };
+}
+
 export function openFloating(x, y, className, build, anchorEl) {
   closeFloating();
 
@@ -51,15 +77,25 @@ export function openFloating(x, y, className, build, anchorEl) {
   const close = () => closeFloating();
   build(panel, close);
 
+  // Clamped within whichever box actually bounds it on screen — the host
+  // dialog's own box when hosted inside one, not just the viewport: a
+  // dialog with overflow:auto (the host app's own .ltn-modal, e.g.) clips a
+  // position:fixed descendant that overflows ITS box even while still
+  // comfortably inside the viewport, silently making the panel disappear
+  // rather than just look misplaced.
   const rect = panel.getBoundingClientRect();
-  if (rect.right > window.innerWidth) {
-    left = Math.max(0, left - rect.width);
-    panel.style.left = `${left}px`;
-  }
-  if (rect.bottom > window.innerHeight) {
-    top = Math.max(0, top - rect.height);
-    panel.style.top = `${top}px`;
-  }
+  ({ left, top } = clampFloatingPosition({
+    left,
+    top,
+    rectRight: rect.right,
+    rectBottom: rect.bottom,
+    panelWidth: rect.width,
+    panelHeight: rect.height,
+    boundRight: hostRect ? hostRect.right : window.innerWidth,
+    boundBottom: hostRect ? hostRect.bottom : window.innerHeight,
+  }));
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
 
   // Deferred by one tick: the click/contextmenu that just opened the panel
   // must not be caught by this same listener and close it right away.

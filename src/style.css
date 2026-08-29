@@ -21,6 +21,20 @@
     sans-serif;
 }
 
+/* Centers the grid within whatever box a host app gives this element (e.g.
+   a dialog reshaped to something other than the grid's own cols:rows ratio)
+   — fitGridToHost (src/render.js) sizes .cll-grid itself, in pixels, to
+   the largest square-celled box that fits here; a host app only needs to
+   give *this* element a real box (e.g. flex:1 in a height-constrained
+   column), nothing more. min-height:0 lets it actually shrink inside a
+   flex/grid ancestor instead of only ever growing to content size. */
+.cll-grid-host {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+}
+
 .cll-grid {
   position: relative;
   display: grid;
