@@ -216,6 +216,18 @@ function buildBorderZone(edgeKey, orientation, edge, geometry) {
 // an actual fixture on the wall, not a small marker on the grid line.
 const EDGE_OVERFLOW = 0.05;
 
+// The border icon's own SVG (buildBorderIcon, src/svg.js) is authored at a
+// fixed LANE_LEN:LANE_THICK ratio (220:40 = 5.5:1) and stretched to fit its
+// zone via preserveAspectRatio="none" — so that zone's own cross-axis size
+// (thickness) has to stay a *fraction of the along-axis size* (~22%, i.e.
+// close to 1/5.5), not a fixed pixel value: a fixed px thickness keeps the
+// same absolute size as the grid (and so each cell) scales up or down, so
+// the zone's aspect ratio drifts from 5.5:1 and the icon (door swing arc
+// especially) stretches into a diagonal smear. Expressed here as a
+// fraction of ONE row's height (h-edges) / one column's width (v-edges),
+// matching how the along-axis width/height above are already computed.
+const EDGE_THICKNESS = 0.22;
+
 /**
  * Fully (re)builds the grid inside `container` from `state`. Rewrites the
  * whole DOM on every call: the grid stays small (a few dozen cells), so a
@@ -244,6 +256,7 @@ export function renderGrid(container, state, options = {}) {
           top: `${(line / rows) * 100}%`,
           left: `${((col - EDGE_OVERFLOW) / cols) * 100}%`,
           width: `${((1 + 2 * EDGE_OVERFLOW) / cols) * 100}%`,
+          height: `${(EDGE_THICKNESS / rows) * 100}%`,
         }),
       );
     }
@@ -256,6 +269,7 @@ export function renderGrid(container, state, options = {}) {
           top: `${((row - EDGE_OVERFLOW) / rows) * 100}%`,
           left: `${(line / cols) * 100}%`,
           height: `${((1 + 2 * EDGE_OVERFLOW) / rows) * 100}%`,
+          width: `${(EDGE_THICKNESS / cols) * 100}%`,
         }),
       );
     }

@@ -52,6 +52,85 @@ function touch(state) {
   return { ...state, meta: { updatedAt: new Date().toISOString() } };
 }
 
+// Grows the grid by one ring on whichever side(s) content (a desk or a
+// border edge) now sits flush against the current outer boundary — called
+// after every edit that can newly reach the edge (toggleDeskAt, setBorderAt
+// below), so there's always at least one free cell beyond anything just
+// placed and the room can keep being extended outward. Mirrors
+// fitGridToContentWithRing's "1-cell ring" rule, but incrementally and only
+// on the side(s) actually touched (never shrinks, never grows a side
+// nothing reaches) — otherwise a border placed right at the edge (the only
+// place the fixed default grid offers) would permanently block adding
+// anything further out on that side.
+function growGridToKeepFreeRing(state) {
+  const { rows, cols } = state.grid;
+  let touchesTop = false;
+  let touchesBottom = false;
+  let touchesLeft = false;
+  let touchesRight = false;
+
+  for (const key of Object.keys(state.cells)) {
+    const { row, col } = parseCellKey(key);
+    if (row === 0) touchesTop = true;
+    if (row === rows - 1) touchesBottom = true;
+    if (col === 0) touchesLeft = true;
+    if (col === cols - 1) touchesRight = true;
+  }
+  for (const key of Object.keys(state.edges)) {
+    const [kind, a, b] = key
+      .split("_")
+      .map((v, i) => (i === 0 ? v : Number(v)));
+    if (kind === "h") {
+      const line = a;
+      const col = b;
+      if (line === 0) touchesTop = true;
+      if (line === rows) touchesBottom = true;
+      if (col === 0) touchesLeft = true;
+      if (col === cols - 1) touchesRight = true;
+    } else {
+      const row = a;
+      const line = b;
+      if (row === 0) touchesTop = true;
+      if (row === rows - 1) touchesBottom = true;
+      if (line === 0) touchesLeft = true;
+      if (line === cols) touchesRight = true;
+    }
+  }
+
+  if (!touchesTop && !touchesBottom && !touchesLeft && !touchesRight) {
+    return state;
+  }
+
+  const rowOffset = touchesTop ? 1 : 0;
+  const colOffset = touchesLeft ? 1 : 0;
+  const newRows = rows + (touchesTop ? 1 : 0) + (touchesBottom ? 1 : 0);
+  const newCols = cols + (touchesLeft ? 1 : 0) + (touchesRight ? 1 : 0);
+
+  const cells = {};
+  for (const [key, cell] of Object.entries(state.cells)) {
+    const { row, col } = parseCellKey(key);
+    cells[cellKey(row + rowOffset, col + colOffset)] = cell;
+  }
+  const edges = {};
+  for (const [key, edge] of Object.entries(state.edges)) {
+    const [kind, a, b] = key
+      .split("_")
+      .map((v, i) => (i === 0 ? v : Number(v)));
+    if (kind === "h") {
+      edges[hEdgeKey(a + rowOffset, b + colOffset)] = edge;
+    } else {
+      edges[vEdgeKey(a + rowOffset, b + colOffset)] = edge;
+    }
+  }
+
+  return {
+    ...state,
+    grid: { cols: newCols, rows: newRows },
+    cells,
+    edges,
+  };
+}
+
 export function toggleDeskAt(state, row, col) {
   const key = cellKey(row, col);
   const cell = state.cells[key];
@@ -70,7 +149,7 @@ export function toggleDeskAt(state, row, col) {
   } else {
     delete cells[key];
   }
-  return touch({ ...state, cells });
+  return touch(growGridToKeepFreeRing({ ...state, cells }));
 }
 
 export function removeDeskAt(state, row, col) {
@@ -173,10 +252,12 @@ export function setBorderAt(state, edgeKey, type) {
   if (!BORDER_TYPES.includes(type)) {
     throw new Error(`Unknown border type: ${type}`);
   }
-  return touch({
-    ...state,
-    edges: { ...state.edges, [edgeKey]: { type, rotation: 0, flip: false } },
-  });
+  return touch(
+    growGridToKeepFreeRing({
+      ...state,
+      edges: { ...state.edges, [edgeKey]: { type, rotation: 0, flip: false } },
+    }),
+  );
 }
 
 export function setSubtitle(state, subtitle) {

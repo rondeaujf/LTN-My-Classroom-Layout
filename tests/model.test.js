@@ -56,49 +56,87 @@ describe("removeDeskAt / rotateDeskAt / setDeskColorAt", () => {
   });
 
   it("rotates the desk in 90° steps, wraps at 360", () => {
-    let state = toggleDeskAt(createEmptyState(), 0, 0);
-    state = rotateDeskAt(state, 0, 0);
-    expect(state.cells[cellKey(0, 0)].rotation).toBe(90);
-    state = rotateDeskAt(rotateDeskAt(rotateDeskAt(state, 0, 0), 0, 0), 0, 0);
-    expect(state.cells[cellKey(0, 0)].rotation).toBe(0);
+    let state = toggleDeskAt(createEmptyState(), 2, 2);
+    state = rotateDeskAt(state, 2, 2);
+    expect(state.cells[cellKey(2, 2)].rotation).toBe(90);
+    state = rotateDeskAt(rotateDeskAt(rotateDeskAt(state, 2, 2), 2, 2), 2, 2);
+    expect(state.cells[cellKey(2, 2)].rotation).toBe(0);
   });
 
   it("applies a color", () => {
-    let state = toggleDeskAt(createEmptyState(), 0, 0);
-    state = setDeskColorAt(state, 0, 0, "#ff000080");
-    expect(state.cells[cellKey(0, 0)].color).toBe("#ff000080");
+    let state = toggleDeskAt(createEmptyState(), 2, 2);
+    state = setDeskColorAt(state, 2, 2, "#ff000080");
+    expect(state.cells[cellKey(2, 2)].color).toBe("#ff000080");
   });
 
   it("toggles stuck, is a no-op on an empty cell", () => {
-    let state = toggleDeskAt(createEmptyState(), 0, 0);
-    state = toggleDeskStuckAt(state, 0, 0);
-    expect(state.cells[cellKey(0, 0)].stuck).toBe(true);
-    state = toggleDeskStuckAt(state, 0, 0);
-    expect(state.cells[cellKey(0, 0)].stuck).toBe(false);
+    let state = toggleDeskAt(createEmptyState(), 2, 2);
+    state = toggleDeskStuckAt(state, 2, 2);
+    expect(state.cells[cellKey(2, 2)].stuck).toBe(true);
+    state = toggleDeskStuckAt(state, 2, 2);
+    expect(state.cells[cellKey(2, 2)].stuck).toBe(false);
 
     expect(toggleDeskStuckAt(state, 5, 5)).toBe(state);
   });
 
   it("sets halfShift independently of stuck, picking the same direction again clears it", () => {
-    let state = toggleDeskAt(createEmptyState(), 0, 0);
-    state = toggleDeskStuckAt(state, 0, 0);
-    state = setDeskHalfShiftAt(state, 0, 0, "up");
-    expect(state.cells[cellKey(0, 0)]).toMatchObject({
+    let state = toggleDeskAt(createEmptyState(), 2, 2);
+    state = toggleDeskStuckAt(state, 2, 2);
+    state = setDeskHalfShiftAt(state, 2, 2, "up");
+    expect(state.cells[cellKey(2, 2)]).toMatchObject({
       stuck: true,
       halfShift: "up",
     });
 
-    state = setDeskHalfShiftAt(state, 0, 0, "up"); // same direction -> clears
-    expect(state.cells[cellKey(0, 0)]).toMatchObject({
+    state = setDeskHalfShiftAt(state, 2, 2, "up"); // same direction -> clears
+    expect(state.cells[cellKey(2, 2)]).toMatchObject({
       stuck: true,
       halfShift: null,
     });
 
-    state = setDeskHalfShiftAt(state, 0, 0, "right"); // switches
-    expect(state.cells[cellKey(0, 0)].halfShift).toBe("right");
+    state = setDeskHalfShiftAt(state, 2, 2, "right"); // switches
+    expect(state.cells[cellKey(2, 2)].halfShift).toBe("right");
 
-    expect(setDeskHalfShiftAt(state, 5, 5, "up")).toBe(state);
-    expect(() => setDeskHalfShiftAt(state, 0, 0, "sideways")).toThrow();
+    expect(setDeskHalfShiftAt(state, 8, 8, "up")).toBe(state);
+    expect(() => setDeskHalfShiftAt(state, 2, 2, "sideways")).toThrow();
+  });
+});
+
+describe("growGridToKeepFreeRing (via toggleDeskAt / setBorderAt)", () => {
+  it("leaves the grid untouched when nothing reaches the boundary", () => {
+    const state = toggleDeskAt(createEmptyState(), 2, 3);
+    expect(state.grid).toEqual({ cols: 5, rows: 6 });
+  });
+
+  it("grows the grid by one ring on the side(s) a desk lands flush against, and reindexes it", () => {
+    // Default grid: cols 0-4, rows 0-5 -> (0,0) is the top-left corner.
+    const state = toggleDeskAt(createEmptyState(), 0, 0);
+    expect(state.grid).toEqual({ cols: 6, rows: 7 });
+    expect(state.cells[cellKey(1, 1)]).toBeDefined();
+    expect(state.cells[cellKey(0, 0)]).toBeUndefined();
+  });
+
+  it("only grows the side(s) actually touched, not all four", () => {
+    // Bottom-right corner: only rows/cols grow, no offset needed.
+    const state = toggleDeskAt(createEmptyState(), 5, 4);
+    expect(state.grid).toEqual({ cols: 6, rows: 7 });
+    expect(state.cells[cellKey(5, 4)]).toBeDefined();
+  });
+
+  it("grows for a border placed flush against the boundary too, reindexing existing content", () => {
+    let state = toggleDeskAt(createEmptyState(), 2, 3); // interior, no growth yet
+    state = setBorderAt(state, hEdgeKey(0, 2), "tableau"); // top wall, line 0
+    expect(state.grid).toEqual({ cols: 5, rows: 7 });
+    // both the border and the earlier desk shift down by one row
+    expect(state.edges[hEdgeKey(1, 2)]).toBeDefined();
+    expect(state.cells[cellKey(3, 3)]).toBeDefined();
+  });
+
+  it("keeps growing ring after ring as content keeps reaching the new edge", () => {
+    let state = toggleDeskAt(createEmptyState(), 0, 0); // grid -> 6x7, desk at (1,1)
+    state = toggleDeskAt(state, 0, 1); // still on the new top row (line 0)
+    expect(state.grid).toEqual({ cols: 6, rows: 8 });
+    expect(Object.keys(state.cells)).toHaveLength(2);
   });
 });
 
@@ -124,19 +162,19 @@ describe("assignStudentAt / unassignStudentAt", () => {
 
 describe("borders", () => {
   it("places then removes a border", () => {
-    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "porte");
-    expect(state.edges[hEdgeKey(0, 2)]).toEqual({
+    let state = setBorderAt(createEmptyState(), hEdgeKey(2, 2), "porte");
+    expect(state.edges[hEdgeKey(2, 2)]).toEqual({
       type: "porte",
       rotation: 0,
       flip: false,
     });
-    state = clearBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)]).toBeUndefined();
+    state = clearBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)]).toBeUndefined();
   });
 
   it("accepts the mur (plain wall) border type", () => {
-    const state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "mur");
-    expect(state.edges[hEdgeKey(0, 2)]).toEqual({
+    const state = setBorderAt(createEmptyState(), hEdgeKey(2, 2), "mur");
+    expect(state.edges[hEdgeKey(2, 2)]).toEqual({
       type: "mur",
       rotation: 0,
       flip: false,
@@ -150,25 +188,25 @@ describe("borders", () => {
   });
 
   it("flips a door's opening side (rotation 0 <-> 180), is a no-op without a border", () => {
-    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "porte");
-    state = rotateBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)].rotation).toBe(180);
-    state = rotateBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)].rotation).toBe(0);
+    let state = setBorderAt(createEmptyState(), hEdgeKey(2, 2), "porte");
+    state = rotateBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)].rotation).toBe(180);
+    state = rotateBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)].rotation).toBe(0);
 
     expect(rotateBorderAt(state, vEdgeKey(9, 9))).toBe(state);
   });
 
   it("flips a door across the wall (flip), independently of its opening side (rotation)", () => {
-    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "porte");
-    state = rotateBorderAt(state, hEdgeKey(0, 2));
-    state = flipBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)]).toMatchObject({
+    let state = setBorderAt(createEmptyState(), hEdgeKey(2, 2), "porte");
+    state = rotateBorderAt(state, hEdgeKey(2, 2));
+    state = flipBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)]).toMatchObject({
       rotation: 180,
       flip: true,
     });
-    state = flipBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)]).toMatchObject({
+    state = flipBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)]).toMatchObject({
       rotation: 180,
       flip: false,
     });
@@ -177,11 +215,11 @@ describe("borders", () => {
   });
 
   it("flips a tableau (chalk tray side)", () => {
-    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "tableau");
-    state = flipBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)].flip).toBe(true);
-    state = flipBorderAt(state, hEdgeKey(0, 2));
-    expect(state.edges[hEdgeKey(0, 2)].flip).toBe(false);
+    let state = setBorderAt(createEmptyState(), hEdgeKey(2, 2), "tableau");
+    state = flipBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)].flip).toBe(true);
+    state = flipBorderAt(state, hEdgeKey(2, 2));
+    expect(state.edges[hEdgeKey(2, 2)].flip).toBe(false);
   });
 });
 

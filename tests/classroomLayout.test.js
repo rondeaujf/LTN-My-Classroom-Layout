@@ -60,7 +60,7 @@ describe("ClassroomLayout", () => {
     layout.applyChange((s) => ({
       ...s,
       cells: {
-        "0_0": {
+        "2_2": {
           type: "desk",
           rotation: 0,
           color: null,
@@ -69,15 +69,20 @@ describe("ClassroomLayout", () => {
       },
     }));
 
+    // Interior cell (2,2): a corner cell would trigger the outer-ring growth
+    // (see growGridToKeepFreeRing, src/model.js) on the very click this test
+    // is asserting on, reindexing it out from under the "0_0" key below —
+    // growth has its own coverage, cf. "toggleDeskAt".
+
     // Re-queried after each click: renderGrid rebuilds the whole grid DOM on
     // every state change (see render.js), so any node reference from before
     // the previous render is stale.
-    click(container.querySelector('[data-row="0"][data-col="0"]'));
-    expect(layout.getState().cells["0_0"].student).toBeNull();
-    expect(layout.getState().cells["0_0"]).toBeDefined();
+    click(container.querySelector('[data-row="2"][data-col="2"]'));
+    expect(layout.getState().cells["2_2"].student).toBeNull();
+    expect(layout.getState().cells["2_2"]).toBeDefined();
 
-    click(container.querySelector('[data-row="0"][data-col="0"]'));
-    expect(layout.getState().cells["0_0"]).toBeUndefined();
+    click(container.querySelector('[data-row="2"][data-col="2"]'));
+    expect(layout.getState().cells["2_2"]).toBeUndefined();
   });
 
   it("keeps the student name centered on the desk-top rect's own true center, whatever the desk's rotation", async () => {

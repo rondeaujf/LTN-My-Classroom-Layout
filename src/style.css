@@ -123,13 +123,16 @@
   cursor: pointer;
 }
 
+/* height/width (the zone's thickness) is set inline per-edge, see render.js
+   (EDGE_THICKNESS) — a fraction of the grid, not a fixed px value, so the
+   border icon (stretched to fit via preserveAspectRatio="none", see
+   buildBorderIcon in svg.js) keeps its intended aspect ratio at any grid
+   size instead of distorting as the grid scales. */
 .cll-edge--h {
-  height: 40px;
   transform: translateY(-50%);
 }
 
 .cll-edge--v {
-  width: 40px;
   transform: translateX(-50%);
 }
 
@@ -486,13 +489,19 @@
   display: none;
 }
 
+/* At the same 16px height as the header rule's text, the logo alone (no
+   label, no border) read as a stray unrelated mark floating under the room
+   rather than an actual page footer — a top rule and real spacing/size mark
+   the band as one, matching the weight of .cll-print-header above it. */
 .cll-print-footer {
-  margin-top: 10px;
+  margin-top: 14px;
+  padding-top: 8px;
+  border-top: 1px solid #d0d5d9;
   text-align: center;
 }
 
 .cll-print-logo {
-  height: 16px;
+  height: 32px;
   width: auto;
 }
 
