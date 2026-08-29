@@ -516,3 +516,117 @@ describe("print()", () => {
     });
   });
 });
+
+describe("editableBorders", () => {
+  let container;
+
+  beforeEach(() => {
+    // Floating panels (borderpicker, context menu) append to document.body
+    // and aren't torn down between tests — start each of these from a clean
+    // body so a "nothing opened" assertion can't see a previous test's panel.
+    document.body.replaceChildren();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  it("is on by default: no lock class, right-clicking an empty border opens the picker", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    expect(
+      container
+        .querySelector(".cll-root")
+        .classList.contains("cll-root--borders-locked"),
+    ).toBe(false);
+
+    click(
+      container.querySelector('.cll-edge[data-edge-key="h_0_0"]'),
+      "contextmenu",
+    );
+    expect(document.querySelectorAll(".cll-borderpicker-btn").length).toBe(4);
+  });
+
+  it("false: root gets .cll-root--borders-locked and border clicks do nothing", async () => {
+    const layout = new ClassroomLayout(container, { editableBorders: false });
+    await layout.ready;
+    expect(
+      container
+        .querySelector(".cll-root")
+        .classList.contains("cll-root--borders-locked"),
+    ).toBe(true);
+
+    const edge = container.querySelector('.cll-edge[data-edge-key="h_0_0"]');
+    click(edge, "contextmenu");
+    expect(document.querySelector(".cll-borderpicker-btn")).toBeNull();
+
+    click(edge);
+    expect(layout.getState().edges).toEqual({});
+  });
+
+  it("false: desks stay fully editable", async () => {
+    const layout = new ClassroomLayout(container, { editableBorders: false });
+    await layout.ready;
+    click(container.querySelector(".cll-cell"));
+    expect(container.querySelectorAll(".cll-cell--desk").length).toBe(1);
+  });
+});
+
+describe("levelFit / print settings", () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  function addLevelledDesk(layout) {
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { firstName: "Ada", level: "CE2" },
+        },
+      },
+    }));
+  }
+
+  it("caps the level badge font at 8px by default", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    addLevelledDesk(layout);
+    expect(container.querySelector(".cll-desk-level").style.fontSize).toBe(
+      "8px",
+    );
+  });
+
+  it("honors options.levelFit.max", async () => {
+    const layout = new ClassroomLayout(container, { levelFit: { max: 15 } });
+    await layout.ready;
+    addLevelledDesk(layout);
+    expect(container.querySelector(".cll-desk-level").style.fontSize).toBe(
+      "15px",
+    );
+  });
+
+  it("forwards nameFit/levelFit/printOrientation/printPaper to options.onPrint", async () => {
+    const onPrint = vi.fn();
+    const layout = new ClassroomLayout(container, {
+      nameFit: { max: 11 },
+      levelFit: { max: 7 },
+      printOrientation: "landscape",
+      printPaper: "A4",
+      onPrint,
+    });
+    await layout.ready;
+
+    layout.print();
+
+    const [, opts] = onPrint.mock.calls[0];
+    expect(opts.nameFit).toEqual({ max: 11 });
+    expect(opts.levelFit).toEqual({ max: 7 });
+    expect(opts.printOrientation).toBe("landscape");
+    expect(opts.printPaper).toBe("A4");
+  });
+});

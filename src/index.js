@@ -31,10 +31,15 @@ export class ClassroomLayout {
    * @param {{firstName?, lastName?, className?, school?, year?}} [options.teacher]
    * @param {{load(): any, save(state): void}} [options.persistence] persistence adapter supplied by the host app
    * @param {(state) => void} [options.onChange]
-   * @param {(state, {teacher, logoUrl, showLevel, nameDisplay}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl, showLevel, nameDisplay}) and show it however the host app displays PDFs
+   * @param {(state, {teacher, logoUrl, showLevel, nameDisplay, nameFit, levelFit, printOrientation, printPaper}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl, showLevel, nameDisplay, nameFit, levelFit}) and show it however the host app displays PDFs. The print settings (nameFit/levelFit/printOrientation/printPaper) are passed straight through so the host can honor them in its own PDF renderer.
    * @param {string} [options.logoUrl] optional host-app logo, shown at the bottom of the print/PDF sheet (mirrors the site's other PDF exports)
    * @param {boolean} [options.showLevel] whether to show the student's level badge on the desk (default true)
    * @param {"full"|"firstName"|"lastName"} [options.nameDisplay] which part of the student's name to show on the desk (default "full")
+   * @param {{max?:number, min?:number}} [options.nameFit] px bounds for the desk name's automatic size-down (default {max:12, min:7})
+   * @param {{max?:number, min?:number}} [options.levelFit] px bounds for the level badge's font (default {max:8, min:7}) — max is the standard size, the badge only ever shrinks from it (down to min) to clear the name
+   * @param {"portrait"|"landscape"} [options.printOrientation] page orientation for print / PDF export (default "portrait")
+   * @param {string} [options.printPaper] paper size for print / PDF export, e.g. "A4" (default), "A3", "letter"
+   * @param {boolean} [options.editableBorders] whether wall/board/door/window border objects can be added, changed or removed (default true) — false locks them, desks stay editable
    */
   constructor(container, options = {}) {
     this.#container =
@@ -109,8 +114,16 @@ export class ClassroomLayout {
   }
 
   #render() {
+    // false = bords (mur/tableau/porte/fenêtre) verrouillés : la classe coupe
+    // l'affordance CSS (cf. style.css) et attachInteractions ignore les clics
+    // sur .cll-edge.
+    this.#root.classList.toggle(
+      "cll-root--borders-locked",
+      this.#options.editableBorders === false,
+    );
     const gridEl = renderGrid(this.#gridHost, this.#state, {
       nameFit: this.#options.nameFit,
+      levelFit: this.#options.levelFit,
       showLevel: this.#options.showLevel,
       nameDisplay: this.#options.nameDisplay,
     });
@@ -157,23 +170,25 @@ export class ClassroomLayout {
 
   print() {
     const teacher = this.#options.teacher ?? this.#state.teacherOverride;
-    const logoUrl = this.#options.logoUrl;
-    const showLevel = this.#options.showLevel;
-    const nameDisplay = this.#options.nameDisplay;
+    // Réglages d'impression transmis tels quels : la même charge utile part
+    // vers onPrint (l'hôte les applique dans son propre moteur PDF) et vers le
+    // printLayout intégré (dialogue navigateur).
+    const printOpts = {
+      teacher,
+      logoUrl: this.#options.logoUrl,
+      showLevel: this.#options.showLevel,
+      nameDisplay: this.#options.nameDisplay,
+      nameFit: this.#options.nameFit,
+      levelFit: this.#options.levelFit,
+      printOrientation: this.#options.printOrientation,
+      printPaper: this.#options.printPaper,
+    };
     if (this.#options.onPrint) {
-      this.#options.onPrint(this.getState(), {
-        teacher,
-        logoUrl,
-        showLevel,
-        nameDisplay,
-      });
+      this.#options.onPrint(this.getState(), printOpts);
       return;
     }
     printLayout(this.#state, {
-      teacher,
-      logoUrl,
-      showLevel,
-      nameDisplay,
+      ...printOpts,
       editableTeacherInputs: !this.#options.teacher,
     });
   }

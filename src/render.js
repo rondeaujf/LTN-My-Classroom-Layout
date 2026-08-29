@@ -124,7 +124,18 @@ function fitText(node, { max = 12, min = 7 } = {}) {
   }
 }
 
-const LEVEL_FONT_MIN = 7;
+// Bornes par défaut de la police du badge de niveau (px). `max` est la taille
+// standard (jamais dépassée) ; le badge ne fait que rétrécir de là vers `min`
+// quand il chevaucherait le nom. Surchargeable via options.levelFit
+// (cf. ClassroomLayout, src/index.js) — même principe que nameFit pour le nom.
+const LEVEL_FIT_DEFAULT = { max: 8, min: 7 };
+
+function resolveLevelFit(levelFit = {}) {
+  return {
+    max: levelFit.max ?? LEVEL_FIT_DEFAULT.max,
+    min: levelFit.min ?? LEVEL_FIT_DEFAULT.min,
+  };
+}
 
 function rectsOverlap(a, b) {
   return !(
@@ -145,10 +156,17 @@ function rectsOverlap(a, b) {
 // are plain axis-aligned rects, whatever the desk's own rotation.
 // Re-positioned after each shrink step: positionLevelBadge anchors the
 // badge by its own current rendered size, which just changed.
-function avoidLevelNameOverlap(levelEl, nameEl, deskSize, rotation, stuck) {
+function avoidLevelNameOverlap(
+  levelEl,
+  nameEl,
+  deskSize,
+  rotation,
+  stuck,
+  minSize = LEVEL_FIT_DEFAULT.min,
+) {
   let size = parseFloat(getComputedStyle(levelEl).fontSize);
   while (
-    size > LEVEL_FONT_MIN &&
+    size > minSize &&
     rectsOverlap(
       levelEl.getBoundingClientRect(),
       nameEl.getBoundingClientRect(),
@@ -378,15 +396,29 @@ export function fitGridToHost(container, grid) {
  * (see README, "Printing your own way").
  */
 export function finalizeLayout(root, options = {}) {
+  const levelFit = resolveLevelFit(options.levelFit);
   for (const desk of root.querySelectorAll(".cll-desk")) {
     const rotation = Number(desk.dataset.rotation ?? 0);
     const stuck = desk.dataset.stuck === "1";
     const levelEl = desk.querySelector(".cll-desk-level");
-    if (levelEl) positionLevelBadge(levelEl, desk.clientWidth, rotation, stuck);
+    if (levelEl) {
+      // Plafonne la police du badge (le CSS ne fixe qu'un repli) AVANT de le
+      // positionner : positionLevelBadge ancre le badge d'après sa taille
+      // rendue réelle.
+      levelEl.style.fontSize = `${levelFit.max}px`;
+      positionLevelBadge(levelEl, desk.clientWidth, rotation, stuck);
+    }
     const nameEl = desk.querySelector(".cll-desk-name");
     if (nameEl) fitText(nameEl, options.nameFit);
     if (levelEl && nameEl) {
-      avoidLevelNameOverlap(levelEl, nameEl, desk.clientWidth, rotation, stuck);
+      avoidLevelNameOverlap(
+        levelEl,
+        nameEl,
+        desk.clientWidth,
+        rotation,
+        stuck,
+        levelFit.min,
+      );
     }
   }
 }

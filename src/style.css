@@ -159,6 +159,19 @@
   background: rgba(47, 111, 158, 0.18);
 }
 
+/* options.editableBorders:false — les bords (mur/tableau/porte/fenêtre) ne
+   sont plus modifiables : pas d'affordance, et les clics traversent jusqu'au
+   bureau/à la cellule dessous (les zones de bord débordent de ~5% sur les
+   cellules voisines, cf. EDGE_OVERFLOW). Un bord déjà posé reste visible. */
+.cll-root--borders-locked .cll-edge {
+  cursor: default;
+  pointer-events: none;
+}
+
+.cll-root--borders-locked .cll-edge:hover {
+  background: transparent;
+}
+
 .cll-edge--set {
   background: transparent;
 }
