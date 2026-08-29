@@ -1,6 +1,6 @@
 export const SCHEMA_VERSION = 1;
 export const DEFAULT_GRID = { cols: 5, rows: 6 };
-export const BORDER_TYPES = ["tableau", "porte", "fenetre"];
+export const BORDER_TYPES = ["tableau", "porte", "fenetre", "mur"];
 
 export function cellKey(row, col) {
   return `${row}_${col}`;
@@ -57,7 +57,14 @@ export function toggleDeskAt(state, row, col) {
   const cell = state.cells[key];
   const cells = { ...state.cells };
   if (!cell) {
-    cells[key] = { type: "desk", rotation: 0, color: null, student: null };
+    cells[key] = {
+      type: "desk",
+      rotation: 0,
+      color: null,
+      student: null,
+      stuck: false,
+      halfShift: null,
+    };
   } else if (cell.student) {
     cells[key] = { ...cell, student: null };
   } else {
@@ -85,6 +92,51 @@ export function rotateDeskAt(state, row, col) {
   });
 }
 
+/**
+ * Toggles whether the desk is pushed flush against its own "head" edge —
+ * the side opposite the chair — instead of sitting with a small margin on
+ * every side. Which screen edge that is follows the desk's current rotation
+ * (0° → top, 90° → right, 180° → bottom, 270° → left) for free, since it's
+ * drawn in the desk's own local (pre-rotation) frame — see buildDeskSvg in
+ * src/svg.js. Independent of setDeskHalfShiftAt below (a much bigger,
+ * container-level shift) — both can be on at once.
+ */
+export function toggleDeskStuckAt(state, row, col) {
+  const key = cellKey(row, col);
+  const cell = state.cells[key];
+  if (!cell) return state;
+  return touch({
+    ...state,
+    cells: { ...state.cells, [key]: { ...cell, stuck: !cell.stuck } },
+  });
+}
+
+// The 4 directions a desk can be half-shifted in — screen-absolute, chosen
+// directly by the user (not derived from the desk's rotation).
+export const HALF_SHIFT_DIRECTIONS = ["up", "down", "left", "right"];
+
+/**
+ * Sets (or, picking the same direction again, clears) a half-cell shift on
+ * the desk — moved half a cell up/down/left/right, out of its own cell and
+ * into the neighboring one, so two desks in adjacent cells can meet in the
+ * middle. Screen-absolute: unlike toggleDeskStuckAt above, this does NOT
+ * follow the desk's rotation — the direction is whatever the caller (the
+ * UI) picked, cf. src/interactions.js.
+ */
+export function setDeskHalfShiftAt(state, row, col, direction) {
+  if (!HALF_SHIFT_DIRECTIONS.includes(direction)) {
+    throw new Error(`Unknown half-shift direction: ${direction}`);
+  }
+  const key = cellKey(row, col);
+  const cell = state.cells[key];
+  if (!cell) return state;
+  const halfShift = cell.halfShift === direction ? null : direction;
+  return touch({
+    ...state,
+    cells: { ...state.cells, [key]: { ...cell, halfShift } },
+  });
+}
+
 export function setDeskColorAt(state, row, col, color) {
   const key = cellKey(row, col);
   const cell = state.cells[key];
@@ -104,6 +156,8 @@ export function assignStudentAt(state, row, col, student) {
     rotation: 0,
     color: null,
     student: null,
+    stuck: false,
+    halfShift: null,
   };
   return touch({
     ...state,
@@ -121,7 +175,7 @@ export function setBorderAt(state, edgeKey, type) {
   }
   return touch({
     ...state,
-    edges: { ...state.edges, [edgeKey]: { type, rotation: 0 } },
+    edges: { ...state.edges, [edgeKey]: { type, rotation: 0, flip: false } },
   });
 }
 
@@ -140,9 +194,10 @@ export function clearBorderAt(state, edgeKey) {
   return touch({ ...state, edges });
 }
 
-// Only meaningful for "porte" (door): flips which side it swings open from.
-// Harmless no-op-looking toggle for symmetric icons (tableau/fenetre) —
-// the UI only offers it for doors, cf. src/interactions.js.
+// Only meaningful for "porte" (door): flips which side it swings open from
+// (mirrors the symbol lengthwise, along the wall). Harmless no-op-looking
+// toggle for other types — the UI only offers it for doors, cf.
+// src/interactions.js.
 export function rotateBorderAt(state, edgeKey) {
   const edge = state.edges[edgeKey];
   if (!edge) return state;
@@ -151,6 +206,55 @@ export function rotateBorderAt(state, edgeKey) {
     ...state,
     edges: { ...state.edges, [edgeKey]: { ...edge, rotation } },
   });
+}
+
+// Flips the symbol across the wall's thickness — which face it's drawn on.
+// For "tableau" ("retourner le tableau"), moves the chalk tray to the other
+// side; for "porte" ("retourner la porte"), swings it into the other room.
+// Independent of rotateBorderAt above (that one flips lengthwise, along the
+// wall — this one flips across it), so a door can combine both. Harmless
+// no-op-looking toggle for other types — the UI only offers it for
+// tableau/porte, cf. src/interactions.js.
+export function flipBorderAt(state, edgeKey) {
+  const edge = state.edges[edgeKey];
+  if (!edge) return state;
+  return touch({
+    ...state,
+    edges: { ...state.edges, [edgeKey]: { ...edge, flip: !edge.flip } },
+  });
+}
+
+/**
+ * A room reads as "enclosed" once every edge around the desks' bounding
+ * rectangle carries a border object (tableau/porte/fenetre) — walls all the
+ * way round, whatever their type. Exposed so the host app/UI can react to it
+ * (e.g. a "cll-grid--closed" class, see render.js).
+ */
+export function isRoomEnclosed(state) {
+  const deskKeys = Object.keys(state.cells);
+  if (deskKeys.length === 0) return false;
+
+  let minR = Infinity;
+  let maxR = -Infinity;
+  let minC = Infinity;
+  let maxC = -Infinity;
+  for (const key of deskKeys) {
+    const { row, col } = parseCellKey(key);
+    minR = Math.min(minR, row);
+    maxR = Math.max(maxR, row);
+    minC = Math.min(minC, col);
+    maxC = Math.max(maxC, col);
+  }
+
+  for (let col = minC; col <= maxC; col++) {
+    if (!state.edges[hEdgeKey(minR, col)]) return false;
+    if (!state.edges[hEdgeKey(maxR + 1, col)]) return false;
+  }
+  for (let row = minR; row <= maxR; row++) {
+    if (!state.edges[vEdgeKey(row, minC)]) return false;
+    if (!state.edges[vEdgeKey(row, maxC + 1)]) return false;
+  }
+  return true;
 }
 
 /**

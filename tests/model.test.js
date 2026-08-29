@@ -4,12 +4,16 @@ import {
   toggleDeskAt,
   removeDeskAt,
   rotateDeskAt,
+  toggleDeskStuckAt,
+  setDeskHalfShiftAt,
   setDeskColorAt,
   assignStudentAt,
   unassignStudentAt,
   setBorderAt,
   clearBorderAt,
   rotateBorderAt,
+  flipBorderAt,
+  isRoomEnclosed,
   fitGridToContentWithRing,
   serializeState,
   deserializeState,
@@ -26,6 +30,8 @@ describe("toggleDeskAt", () => {
       rotation: 0,
       color: null,
       student: null,
+      stuck: false,
+      halfShift: null,
     });
   });
 
@@ -62,6 +68,38 @@ describe("removeDeskAt / rotateDeskAt / setDeskColorAt", () => {
     state = setDeskColorAt(state, 0, 0, "#ff000080");
     expect(state.cells[cellKey(0, 0)].color).toBe("#ff000080");
   });
+
+  it("toggles stuck, is a no-op on an empty cell", () => {
+    let state = toggleDeskAt(createEmptyState(), 0, 0);
+    state = toggleDeskStuckAt(state, 0, 0);
+    expect(state.cells[cellKey(0, 0)].stuck).toBe(true);
+    state = toggleDeskStuckAt(state, 0, 0);
+    expect(state.cells[cellKey(0, 0)].stuck).toBe(false);
+
+    expect(toggleDeskStuckAt(state, 5, 5)).toBe(state);
+  });
+
+  it("sets halfShift independently of stuck, picking the same direction again clears it", () => {
+    let state = toggleDeskAt(createEmptyState(), 0, 0);
+    state = toggleDeskStuckAt(state, 0, 0);
+    state = setDeskHalfShiftAt(state, 0, 0, "up");
+    expect(state.cells[cellKey(0, 0)]).toMatchObject({
+      stuck: true,
+      halfShift: "up",
+    });
+
+    state = setDeskHalfShiftAt(state, 0, 0, "up"); // same direction -> clears
+    expect(state.cells[cellKey(0, 0)]).toMatchObject({
+      stuck: true,
+      halfShift: null,
+    });
+
+    state = setDeskHalfShiftAt(state, 0, 0, "right"); // switches
+    expect(state.cells[cellKey(0, 0)].halfShift).toBe("right");
+
+    expect(setDeskHalfShiftAt(state, 5, 5, "up")).toBe(state);
+    expect(() => setDeskHalfShiftAt(state, 0, 0, "sideways")).toThrow();
+  });
 });
 
 describe("assignStudentAt / unassignStudentAt", () => {
@@ -90,9 +128,19 @@ describe("borders", () => {
     expect(state.edges[hEdgeKey(0, 2)]).toEqual({
       type: "porte",
       rotation: 0,
+      flip: false,
     });
     state = clearBorderAt(state, hEdgeKey(0, 2));
     expect(state.edges[hEdgeKey(0, 2)]).toBeUndefined();
+  });
+
+  it("accepts the mur (plain wall) border type", () => {
+    const state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "mur");
+    expect(state.edges[hEdgeKey(0, 2)]).toEqual({
+      type: "mur",
+      rotation: 0,
+      flip: false,
+    });
   });
 
   it("rejects an unknown border type", () => {
@@ -109,6 +157,52 @@ describe("borders", () => {
     expect(state.edges[hEdgeKey(0, 2)].rotation).toBe(0);
 
     expect(rotateBorderAt(state, vEdgeKey(9, 9))).toBe(state);
+  });
+
+  it("flips a door across the wall (flip), independently of its opening side (rotation)", () => {
+    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "porte");
+    state = rotateBorderAt(state, hEdgeKey(0, 2));
+    state = flipBorderAt(state, hEdgeKey(0, 2));
+    expect(state.edges[hEdgeKey(0, 2)]).toMatchObject({
+      rotation: 180,
+      flip: true,
+    });
+    state = flipBorderAt(state, hEdgeKey(0, 2));
+    expect(state.edges[hEdgeKey(0, 2)]).toMatchObject({
+      rotation: 180,
+      flip: false,
+    });
+
+    expect(flipBorderAt(state, vEdgeKey(9, 9))).toBe(state);
+  });
+
+  it("flips a tableau (chalk tray side)", () => {
+    let state = setBorderAt(createEmptyState(), hEdgeKey(0, 2), "tableau");
+    state = flipBorderAt(state, hEdgeKey(0, 2));
+    expect(state.edges[hEdgeKey(0, 2)].flip).toBe(true);
+    state = flipBorderAt(state, hEdgeKey(0, 2));
+    expect(state.edges[hEdgeKey(0, 2)].flip).toBe(false);
+  });
+});
+
+describe("isRoomEnclosed", () => {
+  it("is false with no desks", () => {
+    expect(isRoomEnclosed(createEmptyState())).toBe(false);
+  });
+
+  it("is false when a desk's bounding rectangle is only partly bordered", () => {
+    let state = toggleDeskAt(createEmptyState(), 2, 3);
+    state = setBorderAt(state, hEdgeKey(2, 3), "tableau");
+    expect(isRoomEnclosed(state)).toBe(false);
+  });
+
+  it("is true once every edge around the desks' bounding rectangle is set", () => {
+    let state = toggleDeskAt(createEmptyState(), 2, 3);
+    state = setBorderAt(state, hEdgeKey(2, 3), "tableau"); // top
+    state = setBorderAt(state, hEdgeKey(3, 3), "fenetre"); // bottom
+    state = setBorderAt(state, vEdgeKey(2, 3), "porte"); // left
+    state = setBorderAt(state, vEdgeKey(2, 4), "fenetre"); // right
+    expect(isRoomEnclosed(state)).toBe(true);
   });
 });
 

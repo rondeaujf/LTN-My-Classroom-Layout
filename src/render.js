@@ -1,5 +1,98 @@
-import { cellKey, hEdgeKey, vEdgeKey, BORDER_TYPES } from "./model.js";
-import { buildDeskSvg, buildBorderIcon } from "./svg.js";
+import {
+  cellKey,
+  hEdgeKey,
+  vEdgeKey,
+  BORDER_TYPES,
+  isRoomEnclosed,
+} from "./model.js";
+import { buildDeskSvg, buildBorderIcon, DESK_TOP_MARGIN } from "./svg.js";
+
+// Screen-absolute — see setDeskHalfShiftAt (src/model.js) and the transform
+// composition note in buildCell below.
+const HALF_SHIFT_TRANSFORM = {
+  up: "translateY(-50%)",
+  down: "translateY(50%)",
+  left: "translateX(-50%)",
+  right: "translateX(50%)",
+};
+
+// The desk-top rect's own top-left corner (as currently displayed, reader's
+// point of view), in the desk's *local* (pre-rotation) coordinates, given
+// the rect's own top edge (`topMargin` — DESK_TOP_MARGIN normally, or 0
+// when "stuck", see buildDeskSvg, src/svg.js). The rect is NOT centered in
+// the 100×100 desk (chair below takes the rest), so rotating the desk
+// doesn't just relabel which of ITS corners is "top-left on screen", it
+// also *moves* that corner: at 90°/270° the rect becomes a vertical strip
+// only half the desk's width, offset from the desk's own edge. Which local
+// corner that is: 0°→the rect's own top-left, 90°→its bottom-left,
+// 180°→its bottom-right, 270°→its top-right (each is the one that lands at
+// screen-top-left once *that* rotation is applied — verified by rotating
+// the rect's actual corners around the desk's center).
+//
+// Half the desk-top rect's own height (50, see buildDeskSvg, src/svg.js).
+// The rect's local *center* — unlike a corner — never moves when the desk
+// rotates: rotation pivots on the desk's own center, and any point rigidly
+// attached to the desk keeps the same position *relative to that pivot*,
+// so anchoring the student name at the rect's true local center (see
+// buildCell below) keeps it centered on the plateau at every rotation, no
+// per-rotation case-work needed.
+const RECT_HALF_HEIGHT = 25;
+function plateauTopLeftLocal(rotation, topMargin) {
+  const bottom = topMargin + 50;
+  switch (rotation) {
+    case 90:
+      return [0, bottom];
+    case 180:
+      return [100, bottom];
+    case 270:
+      return [100, topMargin];
+    default:
+      return [0, topMargin];
+  }
+}
+
+/**
+ * Positions the level badge so it sits just inside the desk-top rect's own
+ * top-left corner (reader's point of view), whatever the desk's rotation —
+ * called after the badge is in the DOM (so its real rendered size, which a
+ * fixed percentage inset can't account for once a 90°/270° rotation makes
+ * the rect only half the desk's width, is known).
+ *
+ * Method: since plateauTopLeftLocal always names the corner that lands at
+ * screen-top-left, "inward" *on screen* from it is always the same fixed
+ * direction — right and down — regardless of rotation, so the target
+ * offset from that corner to the badge's center (margin + half its own
+ * rendered size) is a plain, un-rotated screen-space vector. Rotating that
+ * vector *backwards* by the desk's own rotation gives the matching offset
+ * in the desk's local axes — added directly to the local corner (no
+ * separate forward/inverse round-trip needed: rotating the corner forward
+ * and then this whole sum backward is the identity on the corner, leaving
+ * just the corner plus the backward-rotated offset).
+ */
+function positionLevelBadge(levelEl, deskSize, rotation, stuck) {
+  const [cornerX, cornerY] = plateauTopLeftLocal(
+    rotation,
+    stuck ? 0 : DESK_TOP_MARGIN,
+  );
+  const margin = 4; // px
+  const dx = margin + levelEl.offsetWidth / 2;
+  const dy = margin + levelEl.offsetHeight / 2;
+
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // Inverse of the desk's own forward rotation matrix [[cos,-sin],[sin,cos]].
+  const localDx = cos * dx + sin * dy;
+  const localDy = -sin * dx + cos * dy;
+
+  const localCenterX = (cornerX / 100) * deskSize + localDx;
+  const localCenterY = (cornerY / 100) * deskSize + localDy;
+
+  const leftPx = localCenterX - levelEl.offsetWidth / 2;
+  const topPx = localCenterY - levelEl.offsetHeight / 2;
+  levelEl.style.left = `${(leftPx / deskSize) * 100}%`;
+  levelEl.style.top = `${(topPx / deskSize) * 100}%`;
+}
 
 function el(tag, { className, attrs, text } = {}) {
   const node = document.createElement(tag);
@@ -35,28 +128,60 @@ function buildCell(row, col, cell, options) {
   });
 
   if (cell) {
-    const desk = el("div", { className: "cll-desk" });
-    desk.style.transform = `rotate(${cell.rotation}deg)`;
+    const desk = el("div", {
+      className: cell.stuck ? "cll-desk cll-desk--stuck" : "cll-desk",
+    });
+    // Rotate first (spins the desk in place, no displacement), *then* — if
+    // halfShift is set — a fixed, screen-absolute half-cell translate
+    // listed *before* the rotate: applied in the outer/parent frame, so it
+    // moves the desk up/down/left/right on screen regardless of the desk's
+    // own rotation (see setDeskHalfShiftAt, src/model.js). Independent of
+    // `stuck` (a much smaller nudge baked into the drawing itself, see
+    // buildDeskSvg in src/svg.js) — both can be on at once.
+    const shift = HALF_SHIFT_TRANSFORM[cell.halfShift];
+    desk.style.transform = shift
+      ? `${shift} rotate(${cell.rotation}deg)`
+      : `rotate(${cell.rotation}deg)`;
     if (cell.color) desk.style.setProperty("--cll-desk-color", cell.color);
-    desk.appendChild(buildDeskSvg({ occupied: !!cell.student }));
-    cellEl.appendChild(desk);
+    desk.appendChild(
+      buildDeskSvg({ occupied: !!cell.student, stuck: !!cell.stuck }),
+    );
 
+    // Name/level are children of the (rotated) desk, not the cell, so their
+    // position always tracks the desk's own drawing rather than the grid
+    // cell — and each counter-rotates to stay upright and readable whatever
+    // the desk's rotation.
     if (cell.student) {
       const level = cell.student.level ?? cell.student.niveau ?? "";
       if (level) {
-        cellEl.appendChild(
-          el("div", { className: "cll-desk-level", text: level }),
+        const levelEl = el("div", { className: "cll-desk-level", text: level });
+        levelEl.style.transform = `rotate(${-cell.rotation}deg)`;
+        desk.appendChild(levelEl);
+        // Deferred: needs the badge's real rendered size (offsetWidth/
+        // Height), only available once it's actually laid out in the DOM.
+        requestAnimationFrame(() =>
+          positionLevelBadge(
+            levelEl,
+            desk.clientWidth,
+            cell.rotation,
+            !!cell.stuck,
+          ),
         );
       }
       const name = studentLabel(cell.student);
       if (name) {
         const nameEl = el("div", { className: "cll-desk-name", text: name });
-        cellEl.appendChild(nameEl);
+        const nameCenterY =
+          (cell.stuck ? 0 : DESK_TOP_MARGIN) + RECT_HALF_HEIGHT;
+        nameEl.style.top = `${nameCenterY}%`;
+        nameEl.style.transform = `translate(-50%, -50%) rotate(${-cell.rotation}deg)`;
+        desk.appendChild(nameEl);
         // Deferred measurement: the node must be in the DOM for a real
         // clientWidth.
         requestAnimationFrame(() => fitText(nameEl, options.nameFit));
       }
     }
+    cellEl.appendChild(desk);
     cellEl.classList.add("cll-cell--desk");
   } else {
     cellEl.classList.add("cll-cell--empty");
@@ -72,7 +197,9 @@ function buildBorderZone(edgeKey, orientation, edge, geometry) {
   });
   Object.assign(zone.style, geometry);
   if (edge) {
-    zone.appendChild(buildBorderIcon(edge.type, orientation, edge.rotation));
+    zone.appendChild(
+      buildBorderIcon(edge.type, orientation, edge.rotation, edge.flip),
+    );
   }
   return zone;
 }
@@ -92,6 +219,7 @@ export function renderGrid(container, state, options = {}) {
 
   const { cols, rows } = state.grid;
   const grid = el("div", { className: "cll-grid" });
+  grid.classList.toggle("cll-grid--closed", isRoomEnclosed(state));
   grid.style.setProperty("--cll-cols", cols);
   grid.style.setProperty("--cll-rows", rows);
 
@@ -130,4 +258,7 @@ export function renderGrid(container, state, options = {}) {
   return grid;
 }
 
-export { BORDER_TYPES };
+// plateauTopLeftLocal is exported for unit testing (see tests/render.test.js)
+// — the geometry they compute is otherwise only observable through actual
+// browser layout (levelEl.offsetWidth/Height), which jsdom doesn't provide.
+export { BORDER_TYPES, plateauTopLeftLocal, positionLevelBadge };

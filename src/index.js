@@ -8,6 +8,8 @@ import { renderGrid } from "./render.js";
 import { attachInteractions } from "./interactions.js";
 import { printLayout } from "./print.js";
 
+export { buildPrintSheet } from "./print.js";
+
 export class ClassroomLayout {
   #container;
   #root;
@@ -27,6 +29,8 @@ export class ClassroomLayout {
    * @param {{firstName?, lastName?, className?, school?, year?}} [options.teacher]
    * @param {{load(): any, save(state): void}} [options.persistence] persistence adapter supplied by the host app
    * @param {(state) => void} [options.onChange]
+   * @param {(state, {teacher}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl}) and show it however the host app displays PDFs
+   * @param {string} [options.logoUrl] optional host-app logo, shown at the bottom of the print/PDF sheet (mirrors the site's other PDF exports)
    */
   constructor(container, options = {}) {
     this.#container =
@@ -134,8 +138,15 @@ export class ClassroomLayout {
   }
 
   print() {
+    const teacher = this.#options.teacher ?? this.#state.teacherOverride;
+    const logoUrl = this.#options.logoUrl;
+    if (this.#options.onPrint) {
+      this.#options.onPrint(this.getState(), { teacher, logoUrl });
+      return;
+    }
     printLayout(this.#state, {
-      teacher: this.#options.teacher ?? this.#state.teacherOverride,
+      teacher,
+      logoUrl,
       editableTeacherInputs: !this.#options.teacher,
     });
   }
