@@ -1,4 +1,5 @@
 import { openFloating } from "./popup.js";
+import { buildMenuIcon } from "./svg.js";
 
 function studentLabel(s) {
   if (s.name) return s.name;
@@ -21,7 +22,8 @@ export function openStudentPicker(
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "cll-student-remove";
-      removeBtn.textContent = "Retirer l'élève";
+      removeBtn.appendChild(buildMenuIcon("trash"));
+      removeBtn.appendChild(document.createTextNode("Retirer l'élève"));
       removeBtn.addEventListener("click", () => {
         close();
         onUnassign();

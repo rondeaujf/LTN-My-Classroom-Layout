@@ -1,4 +1,5 @@
 import { openFloating } from "./popup.js";
+import { buildMenuIcon } from "./svg.js";
 
 export function openContextMenu(x, y, items) {
   return openFloating(x, y, "cll-menu", (panel, close) => {
@@ -13,7 +14,14 @@ export function openContextMenu(x, y, items) {
       }
       const li = document.createElement("li");
       li.className = "cll-menu-item" + (item.disabled ? " is-disabled" : "");
-      li.textContent = item.label;
+      const icon = item.icon && buildMenuIcon(item.icon);
+      if (icon) li.appendChild(icon);
+      li.appendChild(
+        Object.assign(document.createElement("span"), {
+          className: "cll-menu-item-label",
+          textContent: item.label,
+        }),
+      );
       if (!item.disabled) {
         li.addEventListener("click", () => {
           close();

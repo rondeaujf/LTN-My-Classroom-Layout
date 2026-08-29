@@ -96,55 +96,56 @@ function laneArc(orientation, mirror, x1, y1, x2, y2, r, className) {
   });
 }
 
-function laneRectOutline(orientation, x, y, w, h, className) {
-  const isV = orientation === "v";
-  return el("rect", {
-    x: isV ? y : x,
-    y: isV ? x : y,
-    width: isV ? h : w,
-    height: isV ? w : h,
-    class: className,
-  });
-}
-
-// Board: just a solid line (seen edge-on, from above) with a small outlined
-// rectangle for the chalk tray — per spec, no color fill, kept minimal.
+// Board: a solid line (seen edge-on, from above) with a second, thinner
+// line running its full length for the chalk tray — no color fill.
 function buildTableauIcon(g, orientation) {
   g.appendChild(
-    laneLine(orientation, false, 6, 20, 214, 20, "cll-border-icon-board"),
+    laneLine(orientation, false, 6, 16, 214, 16, "cll-border-icon-board"),
   );
   g.appendChild(
-    laneRectOutline(orientation, 98, 22, 24, 7, "cll-border-icon-path"),
+    laneLine(orientation, false, 6, 25, 214, 25, "cll-border-icon-path"),
   );
 }
 
 // Window: a set of parallel lines across the wall gap — the standard
 // top-down "glazed opening" pictogram.
 function buildFenetreIcon(g, orientation) {
-  [8, 20, 32].forEach((y) => {
+  [14, 20, 26].forEach((y) => {
     g.appendChild(
       laneLine(orientation, false, 6, y, 214, y, "cll-border-icon-path"),
     );
   });
 }
 
-// Door ajar: a threshold line spanning the opening, a hinge dot near one
-// end, the leaf swung open at ~55°, and a dashed arc tracing its sweep.
-// `rotation` (0/180, see rotateBorderAt in src/model.js) mirrors the whole
-// symbol along the wall to flip which side it opens from.
+// Door ajar: a threshold line spanning the opening, a hinge near one end,
+// and the leaf itself running almost the full width — barely cracked open,
+// so the dashed arc tracing its sweep sits at the far end of the border
+// (not a short stub in the middle). `rotation` (0/180, see rotateBorderAt
+// in src/model.js) mirrors the whole symbol along the wall to flip which
+// side it opens from.
 function buildPorteIcon(g, orientation, rotation) {
   const mirror = rotation === 180;
+  const hinge = [10, 34];
+  const closed = [202, 34]; // leaf flat along the baseline
+  const open = [200, 6]; // leaf ajar, same ~length, just lifted
   g.appendChild(
     laneLine(orientation, false, 6, 34, 214, 34, "cll-border-icon-path"),
   );
   g.appendChild(
-    laneArc(orientation, mirror, 50, 34, 37, 9, 30, "cll-border-icon-arc"),
+    laneArc(
+      orientation,
+      mirror,
+      ...closed,
+      ...open,
+      192,
+      "cll-border-icon-arc",
+    ),
   );
   g.appendChild(
-    laneLine(orientation, mirror, 20, 34, 37, 9, "cll-border-icon-leaf"),
+    laneLine(orientation, mirror, ...hinge, ...open, "cll-border-icon-leaf"),
   );
   g.appendChild(
-    laneCircle(orientation, mirror, 20, 34, 2.2, "cll-border-icon-hinge"),
+    laneCircle(orientation, mirror, ...hinge, 2.5, "cll-border-icon-hinge"),
   );
 }
 
@@ -162,5 +163,60 @@ export function buildBorderIcon(type, orientation = "h", rotation = 0) {
   if (type === "tableau") buildTableauIcon(svg, orientation);
   else if (type === "fenetre") buildFenetreIcon(svg, orientation);
   else buildPorteIcon(svg, orientation, rotation);
+  return svg;
+}
+
+// Small line-icons for context menu entries (one icon per menu item, cf.
+// src/interactions.js) — sober glyphs in the same spirit as the rest of the
+// module, so the menus feel consistent with a host site's own icon set
+// without the module actually depending on any of its assets.
+const MENU_ICON_PATHS = {
+  plus: [
+    { tag: "line", attrs: { x1: 8, y1: 3, x2: 8, y2: 13 } },
+    { tag: "line", attrs: { x1: 3, y1: 8, x2: 13, y2: 8 } },
+  ],
+  rotate: [
+    {
+      tag: "path",
+      attrs: { d: "M12.8 5.2A5.5 5.5 0 1 0 13.4 10.2", fill: "none" },
+    },
+    { tag: "polygon", attrs: { points: "12,2.3 15.3,4.6 11.7,6.6" } },
+  ],
+  palette: [
+    { tag: "circle", attrs: { cx: 8, cy: 8.5, r: 5.5, fill: "none" } },
+    { tag: "circle", attrs: { cx: 6, cy: 6.7, r: 1.1 } },
+    { tag: "circle", attrs: { cx: 10.3, cy: 6.7, r: 1.1 } },
+    { tag: "circle", attrs: { cx: 8, cy: 11, r: 1.1 } },
+  ],
+  personPlus: [
+    { tag: "circle", attrs: { cx: 6, cy: 5.3, r: 2.3, fill: "none" } },
+    {
+      tag: "path",
+      attrs: { d: "M1.5 13.5c0-3 2-4.5 4.5-4.5s4.5 1.5 4.5 4.5", fill: "none" },
+    },
+    { tag: "line", attrs: { x1: 12.5, y1: 4.5, x2: 12.5, y2: 9.5 } },
+    { tag: "line", attrs: { x1: 10, y1: 7, x2: 15, y2: 7 } },
+  ],
+  trash: [
+    { tag: "line", attrs: { x1: 3.5, y1: 4.5, x2: 12.5, y2: 4.5 } },
+    { tag: "path", attrs: { d: "M6 4.5V2.5h4v2", fill: "none" } },
+    {
+      tag: "path",
+      attrs: { d: "M4.5 4.5 5.1 13.5h5.8l0.6-9", fill: "none" },
+    },
+    { tag: "line", attrs: { x1: 6.5, y1: 6.5, x2: 6.5, y2: 11.5 } },
+    { tag: "line", attrs: { x1: 9.5, y1: 6.5, x2: 9.5, y2: 11.5 } },
+  ],
+};
+
+export function buildMenuIcon(name) {
+  const shapes = MENU_ICON_PATHS[name];
+  if (!shapes) return null;
+  const svg = el("svg", {
+    viewBox: "0 0 16 16",
+    class: `cll-menu-icon cll-menu-icon--${name}`,
+    "aria-hidden": "true",
+  });
+  shapes.forEach(({ tag, attrs }) => svg.appendChild(el(tag, attrs)));
   return svg;
 }

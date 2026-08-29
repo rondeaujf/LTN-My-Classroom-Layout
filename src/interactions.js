@@ -82,31 +82,37 @@ function openCellContextMenu(x, y, row, col, ctx) {
   if (!cell) {
     items.push({
       label: "Ajouter un bureau",
+      icon: "plus",
       onSelect: () => ctx.applyChange((s) => toggleDeskAt(s, row, col)),
     });
   } else {
     items.push({
       label: cell.student ? "Changer l'élève…" : "Affecter un élève…",
+      icon: "personPlus",
       onSelect: () => openAssignPopup(x, y, row, col, ctx),
     });
     if (cell.student) {
       items.push({
         label: "Retirer l'élève",
+        icon: "trash",
         onSelect: () => ctx.applyChange((s) => unassignStudentAt(s, row, col)),
       });
     }
     items.push({ separator: true });
     items.push({
       label: "Faire pivoter (90°)",
+      icon: "rotate",
       onSelect: () => ctx.applyChange((s) => rotateDeskAt(s, row, col)),
     });
     items.push({
       label: "Couleur…",
+      icon: "palette",
       onSelect: () => openColorPopup(x, y, row, col, ctx),
     });
     items.push({ separator: true });
     items.push({
       label: "Supprimer le bureau",
+      icon: "trash",
       onSelect: () => ctx.applyChange((s) => removeDeskAt(s, row, col)),
     });
   }
@@ -142,11 +148,13 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
   if (edge.type === "porte") {
     items.push({
       label: "Changer le sens d'ouverture",
+      icon: "rotate",
       onSelect: () => ctx.applyChange((s) => rotateBorderAt(s, edgeKey)),
     });
   }
   items.push({
     label: "Supprimer",
+    icon: "trash",
     onSelect: () => ctx.applyChange((s) => clearBorderAt(s, edgeKey)),
   });
   openContextMenu(x, y, items);

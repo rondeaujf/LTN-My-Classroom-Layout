@@ -139,34 +139,34 @@
 
 /* The board itself: just a solid line, seen edge-on from above. */
 .cll-border-icon-board {
-  stroke: var(--cll-accent);
-  stroke-width: 5;
+  stroke: var(--cll-accent, #2f6f9e);
+  stroke-width: 8;
   stroke-linecap: round;
 }
 
 .cll-border-icon-path {
   fill: none;
-  stroke: var(--cll-accent);
+  stroke: var(--cll-accent, #2f6f9e);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .cll-border-icon-leaf {
-  stroke: var(--cll-accent);
+  stroke: var(--cll-accent, #2f6f9e);
   stroke-width: 3;
   stroke-linecap: round;
 }
 
 .cll-border-icon-arc {
   fill: none;
-  stroke: var(--cll-accent);
+  stroke: var(--cll-accent, #2f6f9e);
   stroke-width: 2;
   stroke-dasharray: 4 3;
 }
 
 .cll-border-icon-hinge {
-  fill: var(--cll-accent);
+  fill: var(--cll-accent, #2f6f9e);
 }
 
 /* ---- Floating panels (menu, color, student, border) ---- */
@@ -195,6 +195,9 @@
 }
 
 .cll-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 7px 10px;
   border-radius: 4px;
   cursor: pointer;
@@ -208,6 +211,22 @@
 .cll-menu-item.is-disabled {
   color: #9aa5ac;
   cursor: default;
+}
+
+.cll-menu-icon {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  stroke: var(--cll-accent, #2f6f9e);
+  fill: var(--cll-accent, #2f6f9e);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.is-disabled .cll-menu-icon {
+  stroke: #9aa5ac;
+  fill: #9aa5ac;
 }
 
 .cll-menu-sep {
@@ -265,8 +284,17 @@
 }
 
 .cll-student-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin-bottom: 8px;
   color: #a03030;
+}
+
+.cll-student-remove .cll-menu-icon {
+  stroke: #a03030;
+  fill: #a03030;
 }
 
 .cll-student-search {
@@ -341,6 +369,15 @@
   background: rgba(47, 111, 158, 0.1);
 }
 
+/* Fixed preview size: unlike a placed border object (which fills its full
+   edge zone, see .cll-border-icon above), the icon here just previews the
+   shape next to its label, so it needs an explicit, modest size instead of
+   100%/100% of an otherwise unconstrained button. */
+.cll-borderpicker-btn .cll-border-icon {
+  width: 64px;
+  height: 24px;
+}
+
 /* ---- Toolbar (subtitle + print/export) ---- */
 .cll-toolbar {
   display: flex;
@@ -359,9 +396,9 @@
 
 .cll-toolbar button {
   padding: 6px 12px;
-  border: 1px solid var(--cll-accent);
+  border: 1px solid var(--cll-accent, #2f6f9e);
   border-radius: 4px;
-  background: var(--cll-accent);
+  background: var(--cll-accent, #2f6f9e);
   color: #fff;
   cursor: pointer;
   white-space: nowrap;
