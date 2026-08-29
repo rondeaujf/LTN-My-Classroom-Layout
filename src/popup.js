@@ -25,7 +25,10 @@ export function closeFloating() {
 // computed relative to the dialog's box rather than the viewport (an
 // element with `transform` — which a centered dialog typically has —
 // becomes the containing block for its `position: fixed` descendants).
-function resolveHost(anchorEl) {
+// Exported for labelDialog.js — same "append inside the host app's own open
+// dialog, if any" rule applies to any overlay the module opens, not just
+// these anchored floating panels.
+export function resolveHost(anchorEl) {
   return anchorEl?.closest?.("dialog[open]") ?? document.body;
 }
 

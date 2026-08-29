@@ -340,11 +340,21 @@ export function isRoomEnclosed(state) {
 
 /**
  * Recomputes the grid as the smallest rectangle containing all content
- * (desks + borders) surrounded by a one-cell empty ring, and reindexes
- * cells/edges accordingly. Called when loading an existing configuration
- * (never during live editing).
+ * (desks + borders) surrounded by a `ringSize`-cell empty ring (default 1),
+ * and reindexes cells/edges accordingly. Called when loading an existing
+ * configuration (never during live editing) with the default ring, and by
+ * buildPrintSheet (src/print.js) with `ringSize: 0` — a wall already sits
+ * flush against the content's own bounding box (it's included in it, see
+ * the edges loop below), so print/export doesn't need the *extra* ring
+ * load-time fitting keeps for further live editing (growGridToKeepFreeRing
+ * above relies on it) — that ring, kept on a narrow room, can waste a good
+ * fraction of the printed page's width on empty margin for nothing.
  */
-export function fitGridToContentWithRing(state, fallbackGrid = DEFAULT_GRID) {
+export function fitGridToContentWithRing(
+  state,
+  fallbackGrid = DEFAULT_GRID,
+  ringSize = 1,
+) {
   let minR = Infinity;
   let maxR = -Infinity;
   let minC = Infinity;
@@ -382,10 +392,10 @@ export function fitGridToContentWithRing(state, fallbackGrid = DEFAULT_GRID) {
     return { ...state, grid: { ...fallbackGrid } };
   }
 
-  const rowOffset = 1 - minR;
-  const colOffset = 1 - minC;
-  const rows = maxR - minR + 1 + 2;
-  const cols = maxC - minC + 1 + 2;
+  const rowOffset = ringSize - minR;
+  const colOffset = ringSize - minC;
+  const rows = maxR - minR + 1 + 2 * ringSize;
+  const cols = maxC - minC + 1 + 2 * ringSize;
 
   const cells = {};
   for (const [key, cell] of Object.entries(state.cells)) {

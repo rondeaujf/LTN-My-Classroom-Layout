@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { plateauTopLeftLocal, positionLevelBadge } from "../src/render.js";
+import {
+  plateauTopLeftLocal,
+  positionLevelBadge,
+  rectsOverlap,
+} from "../src/render.js";
 
 // Pure geometry: which corner of the desk-top rect (in the desk's own
 // local, pre-rotation coordinates) ends up at the screen top-left once the
@@ -132,5 +136,25 @@ describe("positionLevelBadge", () => {
     expect(centerX / DESK_SIZE).toBeLessThan(0.84);
     expect(centerY / DESK_SIZE).toBeGreaterThan(0);
     expect(centerY / DESK_SIZE).toBeLessThan(1);
+  });
+});
+
+describe("rectsOverlap", () => {
+  const rect = (left, top, right, bottom) => ({ left, top, right, bottom });
+
+  it("true for two overlapping rects", () => {
+    expect(rectsOverlap(rect(0, 0, 10, 10), rect(5, 5, 15, 15))).toBe(true);
+  });
+
+  it("false for two separate rects (gap on the x axis)", () => {
+    expect(rectsOverlap(rect(0, 0, 10, 10), rect(11, 0, 20, 10))).toBe(false);
+  });
+
+  it("false for two separate rects (gap on the y axis)", () => {
+    expect(rectsOverlap(rect(0, 0, 10, 10), rect(0, 11, 10, 20))).toBe(false);
+  });
+
+  it("false for two rects that only touch edge-to-edge (no real overlap)", () => {
+    expect(rectsOverlap(rect(0, 0, 10, 10), rect(10, 0, 20, 10))).toBe(false);
   });
 });

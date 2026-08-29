@@ -8,6 +8,11 @@
   --cll-figure: #55707f;
   --cll-line: rgba(0, 0, 0, 0.14);
   --cll-line-strong: rgba(0, 0, 0, 0.28);
+  /* Matches letableaunoir's own --ltn-blue (instituteur.css) — the toolbar
+     (subtitle input, print button) is styled to this site's chrome
+     specifically, unlike --cll-accent above (the room plan's own line
+     color, left as the module's standalone default). */
+  --cll-toolbar-blue: #2c3e50;
   font-family:
     system-ui,
     -apple-system,
@@ -307,7 +312,8 @@
 
 .cll-color-apply,
 .cll-color-reset,
-.cll-student-remove {
+.cll-student-remove,
+.cll-student-add-label {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid #d6dbe0;
@@ -335,6 +341,14 @@
   fill: #a03030;
 }
 
+.cll-student-add-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .cll-student-search {
   width: 100%;
   box-sizing: border-box;
@@ -360,27 +374,6 @@
 
 .cll-student-list li:hover {
   background: rgba(47, 111, 158, 0.1);
-}
-
-.cll-student-free-form {
-  display: flex;
-  gap: 6px;
-}
-
-.cll-student-free-form input {
-  flex: 1;
-  box-sizing: border-box;
-  padding: 6px 8px;
-  border: 1px solid #d6dbe0;
-  border-radius: 4px;
-}
-
-.cll-student-free-form button {
-  padding: 6px 10px;
-  border: 1px solid #d6dbe0;
-  border-radius: 4px;
-  background: #f5f7f8;
-  cursor: pointer;
 }
 
 .cll-borderpicker {
@@ -416,6 +409,114 @@
   height: 24px;
 }
 
+/* ---- Label dialog (labelDialog.js) ---- */
+/* A centered modal, not a small anchored panel (unlike the pickers above):
+   styled to match the host site's own dialog chrome (dark header, white
+   bold title, filled/outline footer buttons — same --cll-toolbar-blue as
+   the toolbar's print button, src/style.css) rather than the module's
+   otherwise self-styled defaults, at the host's explicit request. */
+.cll-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10070;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.cll-dialog {
+  width: 280px;
+  max-width: calc(100% - 32px);
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.cll-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--cll-toolbar-blue, #2c3e50);
+}
+
+.cll-dialog__title {
+  color: #fff;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.cll-dialog__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 22px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.cll-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+}
+
+.cll-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #1c2b33;
+}
+
+.cll-dialog__field input {
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d6dbe0;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.cll-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #eee;
+}
+
+.cll-dialog__btn {
+  padding: 5px 14px;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
+  border-radius: 3px;
+  background: #fff;
+  color: var(--cll-toolbar-blue, #2c3e50);
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.cll-dialog__btn--primary {
+  background: var(--cll-toolbar-blue, #2c3e50);
+  color: #fff;
+}
+
+.cll-dialog__btn--primary:hover {
+  background: #fff;
+  color: var(--cll-toolbar-blue, #2c3e50);
+}
+
 /* ---- Toolbar (subtitle + print/export) ---- */
 .cll-toolbar {
   display: flex;
@@ -428,18 +529,28 @@
   flex: 1;
   box-sizing: border-box;
   padding: 6px 8px;
-  border: 1px solid #d6dbe0;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
   border-radius: 4px;
+  color: var(--cll-toolbar-blue, #2c3e50);
+  font-weight: 600;
 }
 
+/* Site's .ltn-modal__btn shape (letableaunoir/css/ltn-vanilla.css): filled
+   blue, bold white text, hover inverts to blue-on-white. */
 .cll-toolbar button {
-  padding: 6px 12px;
-  border: 1px solid var(--cll-accent, #2f6f9e);
-  border-radius: 4px;
-  background: var(--cll-accent, #2f6f9e);
+  padding: 5px 14px;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
+  border-radius: 3px;
+  background: var(--cll-toolbar-blue, #2c3e50);
   color: #fff;
+  font-weight: bold;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.cll-toolbar button:hover {
+  background: #fff;
+  color: var(--cll-toolbar-blue, #2c3e50);
 }
 
 /* ---- Print ---- */

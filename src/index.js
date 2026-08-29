@@ -9,6 +9,7 @@ import { attachInteractions } from "./interactions.js";
 import { printLayout } from "./print.js";
 
 export { buildPrintSheet } from "./print.js";
+export { finalizeLayout } from "./render.js";
 
 export class ClassroomLayout {
   #container;

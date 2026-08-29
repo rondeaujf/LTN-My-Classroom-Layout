@@ -273,6 +273,15 @@ describe("fitGridToContentWithRing", () => {
     const remapped = Object.keys(fitted.edges)[0];
     expect(remapped).toBeDefined();
   });
+
+  it("accepts a ringSize of 0 (used for print/export, see buildPrintSheet) — content only, no margin", () => {
+    let state = createEmptyState({ cols: 5, rows: 6 });
+    state = toggleDeskAt(state, 2, 3);
+    const fitted = fitGridToContentWithRing(state, undefined, 0);
+
+    expect(fitted.grid).toEqual({ cols: 1, rows: 1 });
+    expect(fitted.cells[cellKey(0, 0)]).toBeDefined();
+  });
 });
 
 describe("serialize / deserialize", () => {
