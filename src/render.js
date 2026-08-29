@@ -160,14 +160,23 @@ function avoidLevelNameOverlap(levelEl, nameEl, deskSize, rotation, stuck) {
   }
 }
 
-function studentLabel(student) {
+// nameDisplay: "full" (default) - firstName + lastName, or the roster's own
+// pre-joined `name` if that's all it has; "firstName"/"lastName" - just that
+// field when the student actually has it (assignStudentAt/studentPicker.js
+// preserve firstName/lastName separately for exactly this), falling back to
+// "full" behavior otherwise (e.g. a roster entry with only `.name`, no
+// split fields, can't be trimmed to just one part of it).
+function studentLabel(student, nameDisplay = "full") {
   if (!student) return "";
+  if (nameDisplay === "firstName" && student.firstName)
+    return student.firstName;
+  if (nameDisplay === "lastName" && student.lastName) return student.lastName;
   if (student.name) return student.name;
   const parts = [student.firstName, student.lastName].filter(Boolean);
   return parts.join(" ");
 }
 
-function buildCell(row, col, cell) {
+function buildCell(row, col, cell, options) {
   const cellEl = el("div", {
     className: "cll-cell",
     attrs: { "data-row": row, "data-col": col },
@@ -205,7 +214,7 @@ function buildCell(row, col, cell) {
     // the desk's rotation.
     if (cell.student) {
       const level = cell.student.level ?? cell.student.niveau ?? "";
-      if (level) {
+      if (level && options.showLevel !== false) {
         const levelEl = el("div", { className: "cll-desk-level", text: level });
         levelEl.style.transform = `rotate(${-cell.rotation}deg)`;
         desk.appendChild(levelEl);
@@ -215,7 +224,7 @@ function buildCell(row, col, cell) {
         // even for the interactive view (grid is still a detached
         // fragment at this point, see renderGrid).
       }
-      const name = studentLabel(cell.student);
+      const name = studentLabel(cell.student, options.nameDisplay);
       if (name) {
         const nameEl = el("div", { className: "cll-desk-name", text: name });
         const nameCenterY =
@@ -283,7 +292,7 @@ export function renderGrid(container, state, options = {}) {
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      grid.appendChild(buildCell(r, c, state.cells[cellKey(r, c)]));
+      grid.appendChild(buildCell(r, c, state.cells[cellKey(r, c)], options));
     }
   }
 
@@ -315,8 +324,40 @@ export function renderGrid(container, state, options = {}) {
   }
 
   container.appendChild(grid);
+  fitGridToHost(container, grid);
   finalizeLayout(grid, options);
   return grid;
+}
+
+/**
+ * Explicitly sizes the grid, in pixels, to the largest square-celled box
+ * that fits `container`'s own current box — CSS alone (width:100% +
+ * aspect-ratio) only reliably keeps cells square when the container's own
+ * rendered shape already happens to match cols:rows; a host app's own
+ * layout (a dialog resized to some other shape, e.g.) can leave container
+ * with an aspect ratio that doesn't, and aspect-ratio has no reliable
+ * cross-browser way to "give way" on whichever axis turns out to be the
+ * scarcer one once the other is otherwise constrained (verified against a
+ * real reproduction of exactly that host layout, not guessed). A no-op
+ * when container's own size doesn't add real information yet (e.g. a
+ * detached node, or 0×0 before the browser has laid it out).
+ *
+ * Safe to call unconditionally, including with no real external
+ * constraint (container sized by its own content, e.g. the module's own
+ * demo, normal document flow): container's height there already comes
+ * from the grid's own CSS-computed (already square) size, so the
+ * recomputed cellSize matches what's already there — a harmless no-op.
+ */
+export function fitGridToHost(container, grid) {
+  const cols = Number(grid.style.getPropertyValue("--cll-cols"));
+  const rows = Number(grid.style.getPropertyValue("--cll-rows"));
+  const hostWidth = container.clientWidth;
+  const hostHeight = container.clientHeight;
+  if (!cols || !rows || !hostWidth || !hostHeight) return;
+
+  const cellSize = Math.min(hostWidth / cols, hostHeight / rows);
+  grid.style.width = `${cellSize * cols}px`;
+  grid.style.height = `${cellSize * rows}px`;
 }
 
 /**
@@ -354,4 +395,10 @@ export function finalizeLayout(root, options = {}) {
 // tests/render.test.js) — the geometry they compute is otherwise only
 // observable through actual browser layout (levelEl.offsetWidth/Height,
 // getBoundingClientRect), which jsdom doesn't provide.
-export { BORDER_TYPES, plateauTopLeftLocal, positionLevelBadge, rectsOverlap };
+export {
+  BORDER_TYPES,
+  plateauTopLeftLocal,
+  positionLevelBadge,
+  rectsOverlap,
+  studentLabel,
+};

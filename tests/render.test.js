@@ -3,6 +3,8 @@ import {
   plateauTopLeftLocal,
   positionLevelBadge,
   rectsOverlap,
+  studentLabel,
+  fitGridToHost,
 } from "../src/render.js";
 
 // Pure geometry: which corner of the desk-top rect (in the desk's own
@@ -139,6 +141,40 @@ describe("positionLevelBadge", () => {
   });
 });
 
+describe("studentLabel", () => {
+  it("defaults to full name (firstName + lastName)", () => {
+    expect(studentLabel({ firstName: "Ada", lastName: "Lovelace" })).toBe(
+      "Ada Lovelace",
+    );
+  });
+
+  it("prefers the roster's own pre-joined name when there's no split", () => {
+    expect(studentLabel({ name: "Ada Lovelace" })).toBe("Ada Lovelace");
+  });
+
+  it('nameDisplay "firstName": just the first name, when available', () => {
+    expect(
+      studentLabel({ firstName: "Ada", lastName: "Lovelace" }, "firstName"),
+    ).toBe("Ada");
+  });
+
+  it('nameDisplay "lastName": just the last name, when available', () => {
+    expect(
+      studentLabel({ firstName: "Ada", lastName: "Lovelace" }, "lastName"),
+    ).toBe("Lovelace");
+  });
+
+  it('nameDisplay "firstName" falls back to the full name when there is no split (only `.name`)', () => {
+    expect(studentLabel({ name: "Ada Lovelace" }, "firstName")).toBe(
+      "Ada Lovelace",
+    );
+  });
+
+  it("empty string for no student", () => {
+    expect(studentLabel(null)).toBe("");
+  });
+});
+
 describe("rectsOverlap", () => {
   const rect = (left, top, right, bottom) => ({ left, top, right, bottom });
 
@@ -156,5 +192,66 @@ describe("rectsOverlap", () => {
 
   it("false for two rects that only touch edge-to-edge (no real overlap)", () => {
     expect(rectsOverlap(rect(0, 0, 10, 10), rect(10, 0, 20, 10))).toBe(false);
+  });
+});
+
+// jsdom has no real layout engine — clientWidth/clientHeight are always 0,
+// so the real "does this actually keep cells square" question can only be
+// verified in a real browser (done via Playwright against an isolated
+// repro of the host app's exact CSS chain, 2026-08-29 — see the module's
+// own commit history). Plain objects standing in for the host/grid
+// elements let the *arithmetic* be checked directly instead.
+function fakeHost(clientWidth, clientHeight) {
+  return { clientWidth, clientHeight };
+}
+function fakeGrid(cols, rows) {
+  const props = { "--cll-cols": String(cols), "--cll-rows": String(rows) };
+  return {
+    style: {
+      getPropertyValue: (name) => props[name] ?? "",
+      width: "",
+      height: "",
+    },
+  };
+}
+
+describe("fitGridToHost", () => {
+  it("width-scarce host: cell size follows width, height shrinks to match", () => {
+    const host = fakeHost(500, 1200);
+    const grid = fakeGrid(5, 6);
+    fitGridToHost(host, grid);
+    expect(grid.style.width).toBe("500px"); // cellSize = 500/5 = 100
+    expect(grid.style.height).toBe("600px"); // 100 * 6 rows
+  });
+
+  it("height-scarce host: cell size follows height, width shrinks to match", () => {
+    const host = fakeHost(1600, 500);
+    const grid = fakeGrid(5, 6);
+    fitGridToHost(host, grid);
+    const cellSize = 500 / 6; // the scarcer of 1600/5 and 500/6
+    expect(grid.style.width).toBe(`${cellSize * 5}px`);
+    expect(grid.style.height).toBe("500px");
+  });
+
+  it("keeps cells perfectly square regardless of which axis is scarce", () => {
+    for (const [w, h] of [
+      [500, 1200],
+      [1600, 500],
+      [900, 700],
+    ]) {
+      const grid = fakeGrid(5, 6);
+      fitGridToHost(fakeHost(w, h), grid);
+      const width = parseFloat(grid.style.width);
+      const height = parseFloat(grid.style.height);
+      expect(width / 5).toBeCloseTo(height / 6, 6); // cellWidth === cellHeight
+    }
+  });
+
+  it("no-ops when the host has no measured size yet (0×0, not yet laid out)", () => {
+    const host = fakeHost(0, 0);
+    const grid = fakeGrid(5, 6);
+    fitGridToHost(host, grid);
+    expect(grid.style.width).toBe("");
+    expect(grid.style.height).toBe("");
   });
 });

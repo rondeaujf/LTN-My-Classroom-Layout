@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ClassroomLayout } from "../src/index.js";
 
+// jsdom doesn't implement ResizeObserver (no real layout engine to observe
+// in the first place) — every real target browser does, so this is a
+// test-only stand-in, not something the module itself needs to guard
+// against.
+global.ResizeObserver ??= class {
+  observe() {}
+  disconnect() {}
+};
+
 function click(el, type = "click") {
   el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
 }
@@ -251,7 +260,9 @@ describe("ClassroomLayout", () => {
     click(document.querySelector(".cll-student-list li"));
     expect(layout.getState().cells["0_0"].student).toEqual({
       id: "__teacher__",
-      name: "Jean Dupont",
+      firstName: "Jean",
+      lastName: "Dupont",
+      name: undefined,
       level: undefined,
     });
 
@@ -417,5 +428,91 @@ describe("print()", () => {
 
     expect(printSpy).toHaveBeenCalledTimes(1);
     printSpy.mockRestore();
+  });
+
+  it("options.showLevel: false hides the level badge entirely (default: shown)", async () => {
+    const layout = new ClassroomLayout(container, { showLevel: false });
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "2_2": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { firstName: "Ada", lastName: "Lovelace", level: "Grade 5" },
+        },
+      },
+    }));
+
+    expect(container.querySelector(".cll-desk-level")).toBeNull();
+    expect(container.querySelector(".cll-desk-name").textContent).toBe(
+      "Ada Lovelace",
+    );
+  });
+
+  it('options.nameDisplay: "firstName" shows just the first name on the desk', async () => {
+    const layout = new ClassroomLayout(container, {
+      nameDisplay: "firstName",
+    });
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "2_2": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { firstName: "Ada", lastName: "Lovelace", level: "Grade 5" },
+        },
+      },
+    }));
+
+    expect(container.querySelector(".cll-desk-name").textContent).toBe("Ada");
+    // Unaffected by nameDisplay — still shown by default.
+    expect(container.querySelector(".cll-desk-level").textContent).toBe(
+      "Grade 5",
+    );
+  });
+
+  it("forwards showLevel/nameDisplay to options.onPrint, for a host app driving its own print/export", async () => {
+    const onPrint = vi.fn();
+    const layout = new ClassroomLayout(container, {
+      showLevel: false,
+      nameDisplay: "firstName",
+      onPrint,
+    });
+    await layout.ready;
+
+    layout.print();
+
+    const [, { showLevel, nameDisplay }] = onPrint.mock.calls[0];
+    expect(showLevel).toBe(false);
+    expect(nameDisplay).toBe("firstName");
+  });
+
+  it("a roster pick keeps firstName/lastName separate (not pre-joined) so nameDisplay can split it later", async () => {
+    const layout = new ClassroomLayout(container, {
+      students: [{ id: "1", firstName: "Ada", lastName: "Lovelace" }],
+    });
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": { type: "desk", rotation: 0, color: null, student: null },
+      },
+    }));
+
+    click(
+      container.querySelector('[data-row="0"][data-col="0"]'),
+      "contextmenu",
+    );
+    click(document.querySelector(".cll-menu-item"));
+    click(document.querySelector(".cll-student-list li"));
+
+    expect(layout.getState().cells["0_0"].student).toMatchObject({
+      firstName: "Ada",
+      lastName: "Lovelace",
+    });
   });
 });

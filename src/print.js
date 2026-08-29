@@ -24,7 +24,7 @@ function metaLine(state, teacher) {
  */
 export function buildPrintSheet(
   rawState,
-  { teacher, editableTeacherInputs, logoUrl } = {},
+  { teacher, editableTeacherInputs, logoUrl, showLevel, nameDisplay } = {},
 ) {
   // The editing grid can be much bigger than its actual content — every
   // border/desk placed flush against its own current edge grows a fresh
@@ -79,7 +79,7 @@ export function buildPrintSheet(
   const gridHost = document.createElement("div");
   gridHost.className = "cll-root cll-print-grid-host";
   sheet.appendChild(gridHost);
-  renderGrid(gridHost, state, {});
+  renderGrid(gridHost, state, { showLevel, nameDisplay });
 
   // Optional host-app logo (options.logoUrl), bottom of the sheet — same
   // spot as the "student list" PDF export footer already used elsewhere in

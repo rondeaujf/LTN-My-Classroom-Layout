@@ -52,7 +52,16 @@ function teacherStudentEntry(teacher) {
   if (!teacher) return null;
   const name = [teacher.firstName, teacher.lastName].filter(Boolean).join(" ");
   if (!name) return null;
-  return { id: TEACHER_STUDENT_ID, name, isTeacher: true };
+  // firstName/lastName kept separate (not pre-joined into `name`) so a desk
+  // can be shown as first-name-only/last-name-only (options.nameDisplay,
+  // src/render.js) once assigned — same reason studentPicker.js's own
+  // roster assignment preserves them instead of collapsing to one string.
+  return {
+    id: TEACHER_STUDENT_ID,
+    firstName: teacher.firstName,
+    lastName: teacher.lastName,
+    isTeacher: true,
+  };
 }
 
 function handleCellClick(row, col, ctx) {
