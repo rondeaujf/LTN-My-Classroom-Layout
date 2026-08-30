@@ -49,8 +49,9 @@ export class ClassroomLayout {
    * @param {{firstName?, lastName?, className?, school?, year?}} [options.teacher]
    * @param {{load(): any, save(state): void}} [options.persistence] persistence adapter supplied by the host app
    * @param {(state) => void} [options.onChange]
-   * @param {(state, {teacher, logoUrl, showLevel, nameDisplay, nameFit, levelFit, printOrientation, printPaper}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl, showLevel, nameDisplay, nameFit, levelFit}) and show it however the host app displays PDFs. The print settings (nameFit/levelFit/printOrientation/printPaper) are passed straight through so the host can honor them in its own PDF renderer.
-   * @param {string} [options.logoUrl] optional host-app logo, shown at the bottom of the print/PDF sheet (mirrors the site's other PDF exports)
+   * @param {(state, {teacher, logoUrl, showLevel, nameDisplay, nameFit, levelFit, printOrientation, printPaper, chrome}) => void} [options.onPrint] overrides the built-in browser print dialog — e.g. to render a PDF from buildPrintSheet(state, {teacher, logoUrl, showLevel, nameDisplay, nameFit, levelFit, chrome}) and show it however the host app displays PDFs. The print settings (nameFit/levelFit/printOrientation/printPaper) are passed straight through so the host can honor them in its own PDF renderer; `chrome` reflects options.pdfChrome.
+   * @param {string} [options.logoUrl] optional host-app logo, shown at the bottom of the print/PDF sheet (mirrors the site's other PDF exports) — suppressed when pdfChrome is false
+   * @param {boolean} [options.pdfChrome] whether buildPrintSheet()/print() add the module's own page chrome — the school/teacher/meta banner and the logo footer (default true). Set false when the host wraps the captured grid in its own header/footer (e.g. a server-side PDF pipeline); the onPrint payload's `chrome` key carries it through.
    * @param {boolean} [options.showLevel] whether to show the student's level badge on the desk (default true)
    * @param {"full"|"firstName"|"lastName"} [options.nameDisplay] which part of the student's name to show on the desk (default "full")
    * @param {{max?:number, min?:number}} [options.nameFit] px bounds for the desk name's automatic size-down (default {max:12, min:5})
@@ -630,6 +631,7 @@ export class ClassroomLayout {
       levelFit: this.#settings.levelFit,
       printOrientation: this.#settings.printOrientation,
       printPaper: this.#options.printPaper,
+      chrome: this.#options.pdfChrome !== false,
     };
     if (this.#options.onPrint) {
       this.#options.onPrint(this.getState(), printOpts);

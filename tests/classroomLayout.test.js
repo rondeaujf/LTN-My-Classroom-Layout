@@ -637,6 +637,25 @@ describe("levelFit / print settings", () => {
     expect(opts.printOrientation).toBe("landscape");
     expect(opts.printPaper).toBe("A4");
   });
+
+  it("onPrint payload chrome is true by default, false with options.pdfChrome:false", async () => {
+    const onDefault = vi.fn();
+    const withDefault = new ClassroomLayout(container, { onPrint: onDefault });
+    await withDefault.ready;
+    withDefault.print();
+    expect(onDefault.mock.calls[0][1].chrome).toBe(true);
+
+    const other = document.createElement("div");
+    document.body.appendChild(other);
+    const onBare = vi.fn();
+    const bare = new ClassroomLayout(other, {
+      pdfChrome: false,
+      onPrint: onBare,
+    });
+    await bare.ready;
+    bare.print();
+    expect(onBare.mock.calls[0][1].chrome).toBe(false);
+  });
 });
 
 describe("wheel zoom", () => {

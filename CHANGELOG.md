@@ -4,6 +4,14 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.3.0
+
+- `options.pdfChrome` (default `true`) / `buildPrintSheet(state, { chrome })`
+  — set `false` to drop the module's own school/teacher/meta banner and logo
+  footer, so a host can wrap the bare captured grid in its own
+  header/footer (e.g. a server-side PDF pipeline). The `onPrint` payload
+  gains a `chrome` key. No change to the default standalone export.
+
 ## 1.2.1
 
 - First public npm release. Added `LICENSE`, this changelog, and package

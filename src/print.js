@@ -21,6 +21,12 @@ function metaLine(state, teacher) {
  * Exposed so a host app can render its own PDF from it (e.g. via
  * html2canvas) instead of going through the browser's print dialog; see
  * options.onPrint in src/index.js.
+ *
+ * `chrome` (default true) toggles the module's own page chrome — the
+ * school/teacher/meta banner AND the logo footer. Pass `chrome: false` when
+ * the host wraps the captured grid in its own header/footer (e.g. a
+ * server-side PDF pipeline): the sheet is then the bare grid only, still
+ * carrying the printOrientation/printPaper datasets.
  */
 export function buildPrintSheet(
   rawState,
@@ -34,6 +40,7 @@ export function buildPrintSheet(
     levelFit,
     printOrientation,
     printPaper,
+    chrome = true,
   } = {},
 ) {
   // The editing grid can be much bigger than its actual content — every
@@ -60,7 +67,7 @@ export function buildPrintSheet(
 
   const school = teacher?.school ?? "";
   const name = teacherName(teacher);
-  if (school || name || editableTeacherInputs) {
+  if (chrome && (school || name || editableTeacherInputs)) {
     const row = document.createElement("div");
     row.className = "cll-print-banner-row";
     row.appendChild(
@@ -80,7 +87,7 @@ export function buildPrintSheet(
     header.appendChild(row);
   }
 
-  const meta = metaLine(state, teacher);
+  const meta = chrome ? metaLine(state, teacher) : "";
   if (meta) {
     header.appendChild(
       Object.assign(document.createElement("div"), {
@@ -89,7 +96,7 @@ export function buildPrintSheet(
       }),
     );
   }
-  sheet.appendChild(header);
+  if (chrome) sheet.appendChild(header);
 
   const gridHost = document.createElement("div");
   gridHost.className = "cll-root cll-print-grid-host";
@@ -103,8 +110,9 @@ export function buildPrintSheet(
 
   // Optional host-app logo (options.logoUrl), bottom of the sheet — same
   // spot as the "student list" PDF export footer already used elsewhere in
-  // the host app, for a consistent look across exports.
-  if (logoUrl) {
+  // the host app, for a consistent look across exports. Skipped with
+  // chrome:false (the host supplies its own footer).
+  if (chrome && logoUrl) {
     const footer = document.createElement("div");
     footer.className = "cll-print-footer";
     const logo = document.createElement("img");
