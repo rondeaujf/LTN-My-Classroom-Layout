@@ -26,6 +26,7 @@ import {
   setTableStudentAt,
   tableAtCell,
   cellOccupied,
+  unassignAllStudents,
 } from "../src/model.js";
 
 describe("toggleDeskAt", () => {
@@ -370,6 +371,24 @@ describe("tables", () => {
     expect(tableAtCell(s, 0, 1)).toBeNull();
     expect(cellOccupied(s, 2, 2)).toBe(true);
     expect(cellOccupied(s, 4, 4)).toBe(false);
+  });
+
+  it("unassignAllStudents clears desks and tables, keeps the furniture", () => {
+    let s = assignStudentAt(createEmptyState(), 1, 1, { name: "A" });
+    s = setDeskColorAt(s, 1, 1, "#abc");
+    s = createTableAt(s, 3, 3, 2, 2);
+    s = setTableStudentAt(s, "3_3", { name: "B" });
+
+    const out = unassignAllStudents(s);
+    expect(out.cells["1_1"].student).toBeNull();
+    expect(out.cells["1_1"].color).toBe("#abc"); // furniture untouched
+    expect(out.tables["3_3"].student).toBeNull();
+    expect(out.tables["3_3"].w).toBe(2);
+  });
+
+  it("unassignAllStudents is a no-op (same ref) when nothing is assigned", () => {
+    const s = createTableAt(toggleDeskAt(createEmptyState(), 1, 1), 3, 3, 2, 2);
+    expect(unassignAllStudents(s)).toBe(s);
   });
 
   it("fitGridToContentWithRing includes tables and reindexes their key", () => {

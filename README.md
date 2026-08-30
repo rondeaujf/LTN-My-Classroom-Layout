@@ -115,6 +115,12 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   whether borders are editable, and the desk-name font size (`nameFit.max`
   — the level badge's `max` follows it at the initial
   `levelFit.max / nameFit.max` ratio). Opening it does not resize the grid.
+  It also has an **Actions** row: a _Portée_ select (**Élèves + layout** /
+  **Élèves** / **Layout**) chooses what _Exporter (JSON)_ writes and what
+  _Importer (JSON)_ reads back from a file (`exportJsonPayload(scope)` /
+  `importJson(input, scope)`); _Désaffecter les élèves_ clears every assigned
+  student but keeps the furniture; _Effacer tout_ resets to the default empty
+  grid.
 - **Wheel zoom**: the mouse wheel over the grid zooms it in/out **toward the
   cell under the pointer** (that cell stays put); the grid host is
   `overflow:auto`, so a zoomed-in plan can be panned, and the page / host
@@ -197,10 +203,13 @@ width/height/aspect-ratio tricks of its own.
 - `layout.setState(state)` — replaces the state (object or JSON string) and re-renders.
 - `layout.applyChange(fn)` — applies a pure `(state) => newState` transform (used internally, exposed for advanced use).
 - `layout.print()` — opens the print / PDF export.
+- `layout.exportJsonPayload(scope?)` — returns `{ version, students?, layout? }` (roster from `options.students` + current state). `scope`: `"both"` (default), `"students"`, or `"layout"`.
+- `layout.importJson(input, scope?)` — applies a payload from `exportJsonPayload()` (string or object; `students`/`layout` both optional). `scope` (default `"both"`) additionally filters which part of a combined file is applied. A `layout` is applied and persisted.
 - `layout.destroy()` — detaches listeners, flushes any pending save, empties the container.
 
 Pure model functions are also exported (`toggleDeskAt`, `rotateDeskAt`,
-`toggleDeskStuckAt`, `setDeskHalfShiftAt`, `setDeskColorAt`, `assignStudentAt`, `unassignStudentAt`, `setBorderAt`,
+`toggleDeskStuckAt`, `setDeskHalfShiftAt`, `setDeskColorAt`, `assignStudentAt`, `unassignStudentAt`, `unassignAllStudents`,
+`createTableAt`, `removeTableAt`, `setTableColorAt`, `setTableStudentAt`, `setBorderAt`,
 `clearBorderAt`, `rotateBorderAt`, `flipBorderAt`, `isRoomEnclosed`, `fitGridToContentWithRing`,
 `serializeState`, `deserializeState`, …) — see `src/model.js` — as is
 `buildPrintSheet(state, {teacher, editableTeacherInputs, logoUrl, showLevel, nameDisplay, nameFit, levelFit, printOrientation, printPaper})`,
