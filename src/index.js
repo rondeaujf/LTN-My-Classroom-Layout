@@ -32,6 +32,13 @@ export class ClassroomLayout {
   // Facteur de zoom molette (survol de la grille). Session uniquement.
   #zoom = 1;
   #gridWheelHandler;
+  // Quelles parties de la barre d'outils intégrée sont affichées
+  // (cf. options.toolbar). `false` partout = aucune barre, l'hôte pilote via
+  // l'API (setSettings/setSubtitle/print/…).
+  #toolbar;
+  // Références vers les contrôles du panneau « Paramètres » pour les
+  // resynchroniser quand setSettings() est appelé par programmation.
+  #settingsControls = {};
 
   /**
    * @param {string|Element} container
@@ -51,6 +58,7 @@ export class ClassroomLayout {
    * @param {"portrait"|"landscape"} [options.printOrientation] page orientation for print / PDF export (default "portrait")
    * @param {string} [options.printPaper] paper size for print / PDF export, e.g. "A4" (default), "A3", "letter"
    * @param {boolean} [options.editableBorders] whether wall/board/door/window border objects can be added, changed or removed (default true) — false locks them, desks stay editable
+   * @param {boolean|{subtitle?:boolean, settings?:boolean, print?:boolean}} [options.toolbar] which parts of the built-in toolbar to render: `true` (default) shows all; `false` shows none (drive it via the API — setSubtitle/settings/setSettings/setZoom/print/exportJsonPayload/importJson/unassignAllStudents/clearLayout); an object hides only the parts set to `false`.
    *
    * The values above marked as such (printOrientation, nameDisplay, showLevel,
    * editableBorders, nameFit.max) are the *initial* values of the toolbar's
@@ -79,6 +87,19 @@ export class ClassroomLayout {
       levelFit: { max: levelMax, min: options.levelFit?.min ?? 5 },
     };
 
+    const tb = options.toolbar;
+    const part = (key) =>
+      tb === false
+        ? false
+        : tb == null || tb === true
+          ? true
+          : tb[key] !== false;
+    this.#toolbar = {
+      subtitle: part("subtitle"),
+      settings: part("settings"),
+      print: part("print"),
+    };
+
     this.#state = createEmptyState(options.gridDefault);
     this.#buildDom();
     this.ready = this.#load();
@@ -87,7 +108,19 @@ export class ClassroomLayout {
   /** Applique un patch de réglages (panneau « Paramètres ») et re-rend. Pas de persistance. */
   #applySetting(patch) {
     Object.assign(this.#settings, patch);
+    this.#syncSettingsPanel();
     this.#render();
+  }
+
+  /** Reflète #settings dans les contrôles du panneau (après un setSettings()). */
+  #syncSettingsPanel() {
+    const c = this.#settingsControls;
+    if (c.orientation) c.orientation.value = this.#settings.printOrientation;
+    if (c.nameDisplay) c.nameDisplay.value = this.#settings.nameDisplay;
+    if (c.showLevel) c.showLevel.checked = this.#settings.showLevel;
+    if (c.editableBorders)
+      c.editableBorders.checked = this.#settings.editableBorders;
+    if (c.fontMax) c.fontMax.value = String(this.#settings.nameFit.max);
   }
 
   /** Re-dimensionne la grille au zoom courant (molette). No-op si pas encore rendue. */
@@ -101,23 +134,31 @@ export class ClassroomLayout {
     this.#root = document.createElement("div");
     this.#root.className = "cll-root";
 
-    const toolbar = document.createElement("div");
-    toolbar.className = "cll-toolbar";
-
-    this.#subtitleInput = document.createElement("input");
-    this.#subtitleInput.type = "text";
-    this.#subtitleInput.placeholder =
-      "Sous-titre (facultatif, affiché à l'impression)";
-    this.#subtitleInput.addEventListener("change", () => {
-      this.applyChange((s) => setSubtitle(s, this.#subtitleInput.value));
-    });
-
-    const printBtn = document.createElement("button");
-    printBtn.type = "button";
-    printBtn.textContent = "Imprimer / Export PDF";
-    printBtn.addEventListener("click", () => this.print());
-
-    toolbar.append(this.#subtitleInput, this.#buildSettings(), printBtn);
+    const parts = [];
+    if (this.#toolbar.subtitle) {
+      this.#subtitleInput = document.createElement("input");
+      this.#subtitleInput.type = "text";
+      this.#subtitleInput.placeholder =
+        "Sous-titre (facultatif, affiché à l'impression)";
+      this.#subtitleInput.addEventListener("change", () => {
+        this.applyChange((s) => setSubtitle(s, this.#subtitleInput.value));
+      });
+      parts.push(this.#subtitleInput);
+    }
+    if (this.#toolbar.settings) parts.push(this.#buildSettings());
+    if (this.#toolbar.print) {
+      const printBtn = document.createElement("button");
+      printBtn.type = "button";
+      printBtn.textContent = "Imprimer / Export PDF";
+      printBtn.addEventListener("click", () => this.print());
+      parts.push(printBtn);
+    }
+    if (parts.length) {
+      const toolbar = document.createElement("div");
+      toolbar.className = "cll-toolbar";
+      toolbar.append(...parts);
+      this.#root.append(toolbar);
+    }
 
     this.#gridHost = document.createElement("div");
     this.#gridHost.className = "cll-grid-host";
@@ -129,7 +170,7 @@ export class ClassroomLayout {
       passive: false,
     });
 
-    this.#root.append(toolbar, this.#gridHost);
+    this.#root.append(this.#gridHost);
     this.#container.appendChild(this.#root);
 
     // Re-fits the grid (fitGridToHost, src/render.js) whenever the host's
@@ -176,20 +217,22 @@ export class ClassroomLayout {
       return label;
     };
 
-    const select = (options, value, onChange) => {
+    const select = (key, options, value, onChange) => {
       const el = document.createElement("select");
       for (const [v, text] of options) {
         el.append(new Option(text, v, false, v === value));
       }
       el.addEventListener("change", () => onChange(el.value));
+      this.#settingsControls[key] = el;
       return el;
     };
 
-    const checkbox = (checked, onChange) => {
+    const checkbox = (key, checked, onChange) => {
       const el = document.createElement("input");
       el.type = "checkbox";
       el.checked = checked;
       el.addEventListener("change", () => onChange(el.checked));
+      this.#settingsControls[key] = el;
       return el;
     };
 
@@ -198,6 +241,7 @@ export class ClassroomLayout {
       field(
         "Orientation",
         select(
+          "orientation",
           [
             ["portrait", "Portrait"],
             ["landscape", "Paysage"],
@@ -213,6 +257,7 @@ export class ClassroomLayout {
       field(
         "Type de nom",
         select(
+          "nameDisplay",
           [
             ["full", "Nom complet"],
             ["firstName", "Prénom"],
@@ -228,7 +273,7 @@ export class ClassroomLayout {
     panel.append(
       field(
         "Badges de niveau",
-        checkbox(this.#settings.showLevel, (v) =>
+        checkbox("showLevel", this.#settings.showLevel, (v) =>
           this.#applySetting({ showLevel: v }),
         ),
       ),
@@ -238,7 +283,7 @@ export class ClassroomLayout {
     panel.append(
       field(
         "Bordures modifiables",
-        checkbox(this.#settings.editableBorders, (v) =>
+        checkbox("editableBorders", this.#settings.editableBorders, (v) =>
           this.#applySetting({ editableBorders: v }),
         ),
       ),
@@ -251,6 +296,7 @@ export class ClassroomLayout {
     fontInput.max = "24";
     fontInput.step = "1";
     fontInput.value = String(this.#settings.nameFit.max);
+    this.#settingsControls.fontMax = fontInput;
     fontInput.addEventListener("change", () => {
       const v = Math.max(5, Math.min(24, Math.round(Number(fontInput.value))));
       fontInput.value = String(v);
@@ -392,9 +438,60 @@ export class ClassroomLayout {
     URL.revokeObjectURL(url);
   }
 
+  // --- API : tout ce que fait la barre d'outils intégrée est aussi
+  //     pilotable ici (utile avec options.toolbar: false). ------------------
+
+  /**
+   * Réglages « Paramètres » effectifs de la session (copie) :
+   * `{ printOrientation, nameDisplay, showLevel, editableBorders, nameFit, levelFit }`.
+   */
+  get settings() {
+    return {
+      ...this.#settings,
+      nameFit: { ...this.#settings.nameFit },
+      levelFit: { ...this.#settings.levelFit },
+    };
+  }
+
+  /**
+   * Change un ou plusieurs réglages de session (mêmes clés que `settings`),
+   * re-rend, et resynchronise le panneau s'il est affiché. NON persisté —
+   * comme les contrôles du panneau. Contrairement au curseur de police du
+   * panneau, `nameFit` et `levelFit` sont indépendants ici.
+   */
+  setSettings(patch) {
+    this.#applySetting(patch);
+  }
+
   /** Facteur de zoom molette courant (1 = grille ajustée avec sa couronne vide). */
   get zoom() {
     return this.#zoom;
+  }
+
+  /** Fixe le zoom (borné à [1, 5]) et re-dimensionne la grille. */
+  setZoom(z) {
+    this.#zoom = Math.min(5, Math.max(1, Number(z) || 1));
+    this.#refitGrid();
+  }
+
+  /** Remet le zoom à 1 (vue ajustée avec la couronne vide). */
+  resetZoom() {
+    this.setZoom(1);
+  }
+
+  /** Fixe le sous-titre (persisté, comme le champ de la barre d'outils). */
+  setSubtitle(text) {
+    this.applyChange((s) => setSubtitle(s, String(text ?? "")));
+  }
+
+  /** Retire tous les élèves des bureaux et des tables (garde le mobilier). */
+  unassignAllStudents() {
+    this.applyChange((s) => unassignAllStudents(s));
+  }
+
+  /** Efface tout : retour à la grille vide par défaut (persisté). */
+  clearLayout() {
+    this.applyChange(() => createEmptyState(this.#options.gridDefault));
   }
 
   /**
@@ -457,7 +554,7 @@ export class ClassroomLayout {
         );
       }
     }
-    this.#subtitleInput.value = this.#state.subtitle;
+    if (this.#subtitleInput) this.#subtitleInput.value = this.#state.subtitle;
     this.#render();
   }
 
@@ -488,7 +585,7 @@ export class ClassroomLayout {
 
   applyChange(fn) {
     this.#state = fn(this.#state);
-    this.#subtitleInput.value = this.#state.subtitle;
+    if (this.#subtitleInput) this.#subtitleInput.value = this.#state.subtitle;
     this.#render();
     this.#scheduleSave();
     this.#options.onChange?.(this.getState());
@@ -514,7 +611,7 @@ export class ClassroomLayout {
 
   setState(state) {
     this.#state = typeof state === "string" ? deserializeState(state) : state;
-    this.#subtitleInput.value = this.#state.subtitle;
+    if (this.#subtitleInput) this.#subtitleInput.value = this.#state.subtitle;
     this.#render();
   }
 

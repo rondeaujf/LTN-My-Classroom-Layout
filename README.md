@@ -195,6 +195,7 @@ width/height/aspect-ratio tricks of its own.
 | `editableBorders`  | `boolean`                                                                                                      | Whether wall / board / door / window border objects can be added, changed or removed (default `true`). `false` locks them — existing borders stay visible, clicks fall through to the desk underneath; desks stay fully editable.                                                                                                                                |
 | `showLevel`        | `boolean`                                                                                                      | Whether to show the student's level badge on the desk (default `true`).                                                                                                                                                                                                                                                                                          |
 | `nameDisplay`      | `"full" \| "firstName" \| "lastName"`                                                                          | Which part of the student's name to show on the desk (default `"full"`). Uses the explicit `firstName`/`lastName` when present; otherwise best-effort splits a pre-joined `name` on whitespace (first token = first name, the rest = last name), so the distinction still works on students stored with only a joined `name`.                                    |
+| `toolbar`          | `boolean \| {subtitle?, settings?, print?}`                                                                    | Which parts of the built-in toolbar to render. `true` (default) shows all; `false` shows none — drive it via the API instead (see below); an object hides only the parts set to `false`.                                                                                                                                                                         |
 
 ### Methods
 
@@ -206,6 +207,20 @@ width/height/aspect-ratio tricks of its own.
 - `layout.exportJsonPayload(scope?)` — returns `{ version, students?, layout? }` (roster from `options.students` + current state). `scope`: `"both"` (default), `"students"`, or `"layout"`.
 - `layout.importJson(input, scope?)` — applies a payload from `exportJsonPayload()` (string or object; `students`/`layout` both optional). `scope` (default `"both"`) additionally filters which part of a combined file is applied. A `layout` is applied and persisted.
 - `layout.destroy()` — detaches listeners, flushes any pending save, empties the container.
+
+**Driving it without the built-in toolbar** (`options.toolbar: false`) — every
+toolbar affordance has an API equivalent:
+
+- `layout.settings` (getter) — the effective session settings
+  `{ printOrientation, nameDisplay, showLevel, editableBorders, nameFit, levelFit }`.
+- `layout.setSettings(patch)` — change any of them (same keys), re-renders, re-syncs
+  the panel if shown. Not persisted. Unlike the panel's font slider, `nameFit` and
+  `levelFit` are independent here.
+- `layout.setZoom(z)` / `layout.resetZoom()` — the grid zoom (`z` clamped to `[1, 5]`);
+  `layout.zoom` reads it.
+- `layout.setSubtitle(text)` — persisted, like the toolbar's subtitle field.
+- `layout.unassignAllStudents()` — clear every assigned student, keep the furniture.
+- `layout.clearLayout()` — reset to the default empty grid.
 
 Pure model functions are also exported (`toggleDeskAt`, `rotateDeskAt`,
 `toggleDeskStuckAt`, `setDeskHalfShiftAt`, `setDeskColorAt`, `assignStudentAt`, `unassignStudentAt`, `unassignAllStudents`,
