@@ -34,36 +34,67 @@
 
       const STORAGE_KEY = "ltn-classroom-layout-demo";
 
-      const students = [
+      // Participants de la Conférence Solvay 1927. `nobel_years` -> `level`
+      // (badge sur le bureau) : l'année, "1903 / 1911" pour un double lauréat,
+      // vide pour les non-lauréats. Doublon "Verschaffelt" de la source retiré.
+      const solvay1927 = [
+        { last_name: "Piccard", first_name: "Auguste", nobel_years: [] },
         {
-          id: "1",
-          firstName: "Ada",
-          lastName: "Lovelace",
-          level: "Grade 5",
-          group: "A",
+          last_name: "Verschaffelt",
+          first_name: "Jules-Émile",
+          nobel_years: [],
+        },
+        { last_name: "Henriot", first_name: "Émile", nobel_years: [] },
+        { last_name: "Ehrenfest", first_name: "Paul", nobel_years: [] },
+        { last_name: "Herzen", first_name: "Édouard", nobel_years: [] },
+        { last_name: "De Donder", first_name: "Théophile", nobel_years: [] },
+        { last_name: "Schrödinger", first_name: "Erwin", nobel_years: [1933] },
+        { last_name: "Pauli", first_name: "Wolfgang", nobel_years: [1945] },
+        { last_name: "Heisenberg", first_name: "Werner", nobel_years: [1932] },
+        { last_name: "Fowler", first_name: "Ralph", nobel_years: [] },
+        { last_name: "Brillouin", first_name: "Léon", nobel_years: [] },
+        { last_name: "Debye", first_name: "Peter", nobel_years: [1936] },
+        { last_name: "Knudsen", first_name: "Martin", nobel_years: [] },
+        {
+          last_name: "Bragg",
+          first_name: "William Lawrence",
+          nobel_years: [1915],
         },
         {
-          id: "2",
-          firstName: "Alan",
-          lastName: "Turing",
-          level: "Grade 5",
-          group: "B",
+          last_name: "Kramers",
+          first_name: "Hendrik Anthony",
+          nobel_years: [],
+        },
+        { last_name: "Dirac", first_name: "Paul", nobel_years: [1933] },
+        { last_name: "Compton", first_name: "Arthur", nobel_years: [1927] },
+        { last_name: "de Broglie", first_name: "Louis", nobel_years: [1929] },
+        { last_name: "Born", first_name: "Max", nobel_years: [1954] },
+        { last_name: "Bohr", first_name: "Niels", nobel_years: [1922] },
+        { last_name: "Langmuir", first_name: "Irving", nobel_years: [1932] },
+        { last_name: "Planck", first_name: "Max", nobel_years: [1918] },
+        { last_name: "Curie", first_name: "Marie", nobel_years: [1903, 1911] },
+        { last_name: "Lorentz", first_name: "Hendrik", nobel_years: [1902] },
+        { last_name: "Einstein", first_name: "Albert", nobel_years: [1921] },
+        { last_name: "Langevin", first_name: "Paul", nobel_years: [] },
+        { last_name: "Guye", first_name: "Charles-Eugène", nobel_years: [] },
+        {
+          last_name: "Wilson",
+          first_name: "Charles Thomson Rees",
+          nobel_years: [1927],
         },
         {
-          id: "3",
-          firstName: "Grace",
-          lastName: "Hopper",
-          level: "Grade 6",
-          group: "A",
-        },
-        {
-          id: "4",
-          firstName: "Katherine",
-          lastName: "Johnson",
-          level: "Grade 6",
-          group: "B",
+          last_name: "Richardson",
+          first_name: "Owen Willans",
+          nobel_years: [1928],
         },
       ];
+
+      const students = solvay1927.map((p, i) => ({
+        id: String(i + 1),
+        firstName: p.first_name,
+        lastName: p.last_name,
+        level: p.nobel_years.join(" / "),
+      }));
 
       const colors = [
         { label: "Site blue", value: "#2f6f9e" },

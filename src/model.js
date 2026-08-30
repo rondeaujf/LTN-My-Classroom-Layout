@@ -237,6 +237,33 @@ export function setTableStudentAt(state, key, student) {
   });
 }
 
+/**
+ * Clears every assigned student from every desk and table, leaving the
+ * furniture, colors and borders in place. No-op if nothing is assigned.
+ */
+export function unassignAllStudents(state) {
+  let changed = false;
+  const cells = {};
+  for (const [key, cell] of Object.entries(state.cells)) {
+    if (cell.student) {
+      changed = true;
+      cells[key] = { ...cell, student: null };
+    } else {
+      cells[key] = cell;
+    }
+  }
+  const tables = {};
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    if (table.student) {
+      changed = true;
+      tables[key] = { ...table, student: null };
+    } else {
+      tables[key] = table;
+    }
+  }
+  return changed ? touch({ ...state, cells, tables }) : state;
+}
+
 export function toggleDeskAt(state, row, col) {
   const key = cellKey(row, col);
   const cell = state.cells[key];

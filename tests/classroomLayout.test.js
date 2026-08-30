@@ -11,6 +11,11 @@ global.ResizeObserver ??= class {
   disconnect() {}
 };
 
+// jsdom has no createObjectURL — the export button only needs it to hand a
+// Blob URL to an <a download>. Stub it so #downloadJson doesn't throw.
+URL.createObjectURL ??= () => "blob:stub";
+URL.revokeObjectURL ??= () => {};
+
 function click(el, type = "click") {
   el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
 }
@@ -978,5 +983,213 @@ describe("round / oval tables", () => {
         new MouseEvent("click", { bubbles: true, cancelable: true }),
       );
     expect(layout.getState().tables["1_1"]).toBeUndefined();
+  });
+});
+
+describe("import / export + reset (Paramètres panel)", () => {
+  let container;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  const actionBtn = (root, label) =>
+    Array.from(root.querySelectorAll(".cll-settings-action-btn")).find(
+      (b) => b.textContent === label,
+    );
+
+  const withDeskAndStudent = (layout) =>
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "1_1": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { id: "9", firstName: "Ada" },
+        },
+      },
+    }));
+
+  it("exportJsonPayload() carries the roster and the current layout", async () => {
+    const students = [{ id: "1", firstName: "Ada", lastName: "Lovelace" }];
+    const layout = new ClassroomLayout(container, { students });
+    await layout.ready;
+    withDeskAndStudent(layout);
+
+    const p = layout.exportJsonPayload();
+    expect(p.students).toEqual(students);
+    expect(p.layout).toEqual(layout.getState());
+    expect(p.layout.cells["1_1"].student.firstName).toBe("Ada");
+  });
+
+  it("exportJsonPayload(scope) keeps only the requested part", async () => {
+    const students = [{ id: "1", firstName: "Ada" }];
+    const layout = new ClassroomLayout(container, { students });
+    await layout.ready;
+
+    const s = layout.exportJsonPayload("students");
+    expect(s.students).toEqual(students);
+    expect(s.layout).toBeUndefined();
+
+    const l = layout.exportJsonPayload("layout");
+    expect(l.layout).toEqual(layout.getState());
+    expect(l.students).toBeUndefined();
+  });
+
+  it("importJson(payload, scope) applies only the requested part", async () => {
+    const layout = new ClassroomLayout(container, {
+      students: [{ id: "0", firstName: "Old" }],
+    });
+    await layout.ready;
+    const before = layout.getState();
+    const payload = {
+      students: [{ id: "1", firstName: "New" }],
+      layout: {
+        grid: { cols: 5, rows: 6 },
+        cells: {
+          "2_2": { type: "desk", rotation: 0, color: null, student: null },
+        },
+        edges: {},
+        tables: {},
+      },
+    };
+
+    layout.importJson(payload, "students");
+    expect(layout.exportJsonPayload().students[0].firstName).toBe("New");
+    expect(layout.getState().cells).toEqual(before.cells); // layout untouched
+
+    layout.importJson(payload, "layout");
+    expect(container.querySelectorAll(".cll-cell--desk").length).toBe(1);
+  });
+
+  it("the Actions row has a Portée scope select (both / students / layout)", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const sel = container.querySelector(".cll-settings-scope");
+    expect(sel).not.toBeNull();
+    expect(Array.from(sel.options).map((o) => o.value)).toEqual([
+      "both",
+      "students",
+      "layout",
+    ]);
+    expect(sel.value).toBe("both");
+  });
+
+  it("importJson({students}) swaps the roster the picker offers", async () => {
+    const layout = new ClassroomLayout(container, { students: [] });
+    await layout.ready;
+    layout.importJson({
+      students: [{ id: "42", firstName: "Niels", lastName: "Bohr" }],
+    });
+    expect(layout.exportJsonPayload().students).toEqual([
+      { id: "42", firstName: "Niels", lastName: "Bohr" },
+    ]);
+  });
+
+  it("importJson({layout}) replaces the layout and persists it", async () => {
+    const save = vi.fn();
+    const layout = new ClassroomLayout(container, { persistence: { save } });
+    await layout.ready;
+    vi.useFakeTimers();
+
+    layout.importJson({
+      layout: {
+        grid: { cols: 5, rows: 6 },
+        cells: {
+          "2_2": { type: "desk", rotation: 0, color: null, student: null },
+        },
+        edges: {},
+        tables: {},
+      },
+    });
+    expect(container.querySelectorAll(".cll-cell--desk").length).toBe(1);
+
+    layout.destroy(); // flushes the debounced save
+    expect(save).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("import round-trips an export", async () => {
+    const a = new ClassroomLayout(container, {
+      students: [{ id: "1", firstName: "X" }],
+    });
+    await a.ready;
+    withDeskAndStudent(a);
+    const payload = a.exportJsonPayload();
+
+    const other = document.createElement("div");
+    document.body.appendChild(other);
+    const b = new ClassroomLayout(other, {});
+    await b.ready;
+    b.importJson(payload);
+
+    expect(b.exportJsonPayload().students).toEqual(payload.students);
+    expect(b.getState().cells["1_1"].student.firstName).toBe("Ada");
+  });
+
+  it("'Désaffecter les élèves' clears every student, keeps the furniture", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) =>
+      setTableStudentAt(
+        {
+          ...s,
+          cells: {
+            "1_1": {
+              type: "desk",
+              rotation: 0,
+              color: null,
+              student: { name: "A" },
+            },
+          },
+          tables: {
+            "3_3": {
+              w: 2,
+              h: 2,
+              shape: "round",
+              color: null,
+              student: { name: "B" },
+            },
+          },
+        },
+        "3_3",
+        { name: "B" },
+      ),
+    );
+
+    click(actionBtn(container, "Désaffecter les élèves"));
+    expect(layout.getState().cells["1_1"].student).toBeNull();
+    expect(layout.getState().cells["1_1"].type).toBe("desk");
+    expect(layout.getState().tables["3_3"].student).toBeNull();
+    expect(layout.getState().tables["3_3"].w).toBe(2);
+  });
+
+  it("'Effacer tout' resets to the default empty grid", async () => {
+    const layout = new ClassroomLayout(container, {
+      gridDefault: { cols: 4, rows: 4 },
+    });
+    await layout.ready;
+    withDeskAndStudent(layout);
+    expect(container.querySelectorAll(".cll-cell--desk").length).toBe(1);
+
+    click(actionBtn(container, "Effacer tout"));
+    expect(layout.getState().cells).toEqual({});
+    expect(layout.getState().tables).toEqual({});
+    expect(layout.getState().grid).toEqual({ cols: 4, rows: 4 });
+    expect(container.querySelectorAll(".cll-cell--desk").length).toBe(0);
+  });
+
+  it("'Exporter (JSON)' triggers a download without throwing", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    click(actionBtn(container, "Exporter (JSON)"));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    clickSpy.mockRestore();
   });
 });

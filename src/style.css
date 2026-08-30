@@ -707,6 +707,46 @@
   width: 4em;
 }
 
+/* Ligne « Actions » : libellé au-dessus, boutons en grille en dessous. */
+.cll-settings-field--actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.cll-settings-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* Portée import/export : pleine largeur, au-dessus des boutons. */
+.cll-settings-scope {
+  grid-column: 1 / -1;
+  padding: 3px 6px;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
+  border-radius: 4px;
+  color: var(--cll-toolbar-blue, #2c3e50);
+  font: inherit;
+  font-size: 12px;
+}
+
+.cll-settings-action-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--cll-toolbar-blue, #2c3e50);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cll-settings-action-btn:hover {
+  background: var(--cll-toolbar-blue, #2c3e50);
+  color: #fff;
+}
+
 /* ---- Print ---- */
 /* Unconditional (not @media print) except the display:none/block toggle:
    a host app can render this sheet outside of an actual browser print (e.g.

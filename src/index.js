@@ -3,6 +3,7 @@ import {
   fitGridToContentWithRing,
   deserializeState,
   setSubtitle,
+  unassignAllStudents,
 } from "./model.js";
 import { renderGrid, fitGridToHost } from "./render.js";
 import { attachInteractions } from "./interactions.js";
@@ -263,8 +264,132 @@ export class ClassroomLayout {
     });
     panel.append(field("Taille du nom (px)", fontInput));
 
+    // Actions : import / export JSON + deux réinitialisations. Le <select>
+    // « Portée » décide ce qu'importent/exportent les deux boutons JSON :
+    // élèves seuls, layout seul, ou les deux.
+    const actions = document.createElement("div");
+    actions.className = "cll-settings-actions";
+
+    const actionBtn = (label, onClick) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "cll-settings-action-btn";
+      b.textContent = label;
+      b.addEventListener("click", onClick);
+      return b;
+    };
+
+    const scopeSelect = document.createElement("select");
+    scopeSelect.className = "cll-settings-scope";
+    for (const [v, text] of [
+      ["both", "Élèves + layout"],
+      ["students", "Élèves"],
+      ["layout", "Layout"],
+    ]) {
+      scopeSelect.append(new Option(text, v, v === "both", v === "both"));
+    }
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "application/json,.json";
+    fileInput.hidden = true;
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = "";
+      if (!file) return;
+      file
+        .text()
+        .then((text) => this.importJson(text, scopeSelect.value))
+        .catch((err) =>
+          console.error("ClassroomLayout: import JSON invalide", err),
+        );
+    });
+
+    actions.append(
+      scopeSelect,
+      actionBtn("Exporter (JSON)", () => this.#downloadJson(scopeSelect.value)),
+      actionBtn("Importer (JSON)", () => fileInput.click()),
+      actionBtn("Désaffecter les élèves", () =>
+        this.applyChange((s) => unassignAllStudents(s)),
+      ),
+      actionBtn("Effacer tout", () =>
+        this.applyChange(() => createEmptyState(this.#options.gridDefault)),
+      ),
+      fileInput,
+    );
+
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "cll-settings-field cll-settings-field--actions";
+    actionsRow.append(
+      Object.assign(document.createElement("span"), { textContent: "Actions" }),
+      actions,
+    );
+    panel.append(actionsRow);
+
     wrap.append(toggle, panel);
     return wrap;
+  }
+
+  /**
+   * Instantané JSON-sérialisable. `scope` : `"both"` (défaut) -> roster
+   * (`options.students`) + layout (état courant) ; `"students"` -> que le
+   * roster ; `"layout"` -> que le layout.
+   * @param {"both"|"students"|"layout"} [scope]
+   */
+  exportJsonPayload(scope = "both") {
+    const payload = { version: 1 };
+    if (scope !== "layout") payload.students = this.#options.students ?? [];
+    if (scope !== "students") payload.layout = this.getState();
+    return payload;
+  }
+
+  /**
+   * Applique un payload de `exportJsonPayload()` — ou tout JSON n'ayant que
+   * `students`, ou que `layout`. `scope` filtre en plus ce qu'on applique
+   * depuis un fichier combiné (`"both"` par défaut). Un `layout` appliqué est
+   * persisté (comme n'importe quelle modification).
+   * @param {string|object} input
+   * @param {"both"|"students"|"layout"} [scope]
+   * @returns {boolean} true si quelque chose a été appliqué
+   */
+  importJson(input, scope = "both") {
+    const data = typeof input === "string" ? JSON.parse(input) : input;
+    if (!data || typeof data !== "object") return false;
+    let applied = false;
+    if (scope !== "layout" && Array.isArray(data.students)) {
+      this.#options = { ...this.#options, students: data.students };
+      applied = true;
+    }
+    if (
+      scope !== "students" &&
+      data.layout &&
+      typeof data.layout === "object"
+    ) {
+      const normalized = deserializeState(JSON.stringify(data.layout));
+      this.applyChange(() =>
+        fitGridToContentWithRing(normalized, this.#options.gridDefault),
+      );
+      applied = true;
+    } else if (applied) {
+      this.#render(); // seul le roster a changé -> que le picker s'en serve
+    }
+    return applied;
+  }
+
+  #downloadJson(scope = "both") {
+    const name =
+      { students: "ma-classe-eleves.json", layout: "ma-classe-layout.json" }[
+        scope
+      ] ?? "ma-classe.json";
+    const text = JSON.stringify(this.exportJsonPayload(scope), null, 2);
+    const url = URL.createObjectURL(
+      new Blob([text], { type: "application/json" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   /** Facteur de zoom molette courant (1 = grille ajustée avec sa couronne vide). */
