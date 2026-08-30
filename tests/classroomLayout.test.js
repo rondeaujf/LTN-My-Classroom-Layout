@@ -1193,3 +1193,154 @@ describe("import / export + reset (Paramètres panel)", () => {
     clickSpy.mockRestore();
   });
 });
+
+describe("options.toolbar + settings/zoom/subtitle API", () => {
+  let container;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  const toolbarButtons = (root) =>
+    Array.from(root.querySelectorAll(".cll-toolbar button")).map(
+      (b) => b.textContent,
+    );
+
+  it("toolbar: false renders no toolbar, the grid still works", async () => {
+    const layout = new ClassroomLayout(container, { toolbar: false });
+    await layout.ready;
+    expect(container.querySelector(".cll-toolbar")).toBeNull();
+    expect(container.querySelector(".cll-settings")).toBeNull();
+    expect(
+      container.querySelector('.cll-toolbar input[type="text"]'),
+    ).toBeNull();
+    expect(container.querySelectorAll(".cll-cell").length).toBe(30);
+
+    // The subtitle-input guard: applyChange / setSubtitle must not throw.
+    expect(() => layout.setSubtitle("Rentrée")).not.toThrow();
+    expect(layout.getState().subtitle).toBe("Rentrée");
+  });
+
+  it("toolbar: { print: false } keeps subtitle + settings, drops the print button", async () => {
+    const layout = new ClassroomLayout(container, {
+      toolbar: { print: false },
+    });
+    await layout.ready;
+    expect(container.querySelector(".cll-toolbar")).not.toBeNull();
+    expect(container.querySelector(".cll-settings")).not.toBeNull();
+    expect(
+      container.querySelector('.cll-toolbar input[type="text"]'),
+    ).not.toBeNull();
+    expect(toolbarButtons(container)).not.toContain("Imprimer / Export PDF");
+  });
+
+  it("toolbar: { subtitle: false, settings: false } leaves only the print button", async () => {
+    const layout = new ClassroomLayout(container, {
+      toolbar: { subtitle: false, settings: false },
+    });
+    await layout.ready;
+    expect(
+      container.querySelector('.cll-toolbar input[type="text"]'),
+    ).toBeNull();
+    expect(container.querySelector(".cll-settings")).toBeNull();
+    expect(toolbarButtons(container)).toEqual(["Imprimer / Export PDF"]);
+  });
+
+  it("get settings() returns the effective session settings", async () => {
+    const layout = new ClassroomLayout(container, {
+      printOrientation: "landscape",
+      nameFit: { max: 11 },
+    });
+    await layout.ready;
+    expect(layout.settings).toMatchObject({
+      printOrientation: "landscape",
+      nameDisplay: "full",
+      showLevel: true,
+      editableBorders: true,
+      nameFit: { max: 11, min: 5 },
+    });
+    // a copy, not the internal object
+    layout.settings.showLevel = false;
+    expect(layout.settings.showLevel).toBe(true);
+  });
+
+  it("setSettings() re-renders, syncs the panel, and feeds onPrint", async () => {
+    const onPrint = vi.fn();
+    const layout = new ClassroomLayout(container, { onPrint });
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { firstName: "Ada", level: "CE2" },
+        },
+      },
+    }));
+
+    layout.setSettings({ printOrientation: "landscape", showLevel: false });
+    expect(layout.settings.printOrientation).toBe("landscape");
+    expect(container.querySelector(".cll-desk-level")).toBeNull();
+    // panel control resynced
+    const orientationSel = Array.from(
+      container.querySelectorAll(".cll-settings-field select"),
+    )[0];
+    expect(orientationSel.value).toBe("landscape");
+
+    layout.print();
+    expect(onPrint.mock.calls[0][1].printOrientation).toBe("landscape");
+  });
+
+  it("setZoom clamps to [1,5]; resetZoom returns to 1", async () => {
+    const layout = new ClassroomLayout(container, { toolbar: false });
+    await layout.ready;
+    layout.setZoom(3);
+    expect(layout.zoom).toBe(3);
+    layout.setZoom(0.1);
+    expect(layout.zoom).toBe(1);
+    layout.setZoom(99);
+    expect(layout.zoom).toBe(5);
+    layout.resetZoom();
+    expect(layout.zoom).toBe(1);
+  });
+
+  it("setSubtitle updates the state and the input when shown", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.setSubtitle("Conférence Solvay");
+    expect(layout.getState().subtitle).toBe("Conférence Solvay");
+    expect(
+      container.querySelector('.cll-toolbar input[type="text"]').value,
+    ).toBe("Conférence Solvay");
+  });
+
+  it("unassignAllStudents() and clearLayout() instance methods", async () => {
+    const layout = new ClassroomLayout(container, {
+      gridDefault: { cols: 4, rows: 4 },
+    });
+    await layout.ready;
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "1_1": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { name: "X" },
+        },
+      },
+    }));
+
+    layout.unassignAllStudents();
+    expect(layout.getState().cells["1_1"].student).toBeNull();
+    expect(layout.getState().cells["1_1"].type).toBe("desk");
+
+    layout.clearLayout();
+    expect(layout.getState().cells).toEqual({});
+    expect(layout.getState().grid).toEqual({ cols: 4, rows: 4 });
+  });
+});
