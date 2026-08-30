@@ -1,7 +1,7 @@
 {
   "name": "ltn-classroom-layout",
-  "version": "1.2.0",
-  "description": "Standalone vanilla JS module for an interactive classroom seating chart: desk grid, rotation/color, student assignment, border objects (board/door/window), print export.",
+  "version": "1.2.1",
+  "description": "Standalone vanilla JS module for an interactive classroom seating chart: desk grid, round/oval tables, rotation/color, student assignment, border objects (wall/board/door/window), wheel zoom, print / PDF export, JSON import/export.",
   "type": "module",
   "main": "src/index.js",
   "module": "src/index.js",
@@ -9,9 +9,14 @@
     ".": "./src/index.js",
     "./style.css": "./src/style.css"
   },
+  "sideEffects": [
+    "src/style.css"
+  ],
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "vitest run",
@@ -19,16 +24,33 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm test && npm run lint && npm run format:check"
   },
   "keywords": [
     "classroom",
     "seating-chart",
     "plan-de-classe",
-    "education"
+    "education",
+    "vanilla-js",
+    "no-framework"
   ],
   "author": "Jean-François Rondeau",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rondeaujf/LTN-My-Classroom-Layout.git"
+  },
+  "homepage": "https://github.com/rondeaujf/LTN-My-Classroom-Layout#readme",
+  "bugs": {
+    "url": "https://github.com/rondeaujf/LTN-My-Classroom-Layout/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.9.1",
