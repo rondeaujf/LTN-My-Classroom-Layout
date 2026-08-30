@@ -109,4 +109,25 @@ describe("buildPrintSheet", () => {
     expect(table.classList.contains("cll-table--oval")).toBe(true);
     expect(sheet.querySelector(".cll-table-name").textContent).toBe("Groupe A");
   });
+
+  it("chrome:false drops the banner and logo footer, keeping the bare grid", () => {
+    const sheet = buildPrintSheet(createEmptyState(), {
+      teacher: { firstName: "J.", lastName: "Doe", school: "École X" },
+      logoUrl: "/logo.png",
+      chrome: false,
+    });
+    expect(sheet.querySelector(".cll-print-header")).toBeNull();
+    expect(sheet.querySelector(".cll-print-footer")).toBeNull();
+    // still a usable sheet: grid + the datasets a host PDF renderer reads.
+    expect(sheet.querySelector(".cll-print-grid-host")).not.toBeNull();
+    expect(sheet.dataset.printOrientation).toBe("portrait");
+    expect(sheet.dataset.printPaper).toBe("A4");
+  });
+
+  it("chrome defaults to true (banner still shown when omitted)", () => {
+    const sheet = buildPrintSheet(createEmptyState(), {
+      teacher: { firstName: "J.", lastName: "Doe", school: "École X" },
+    });
+    expect(sheet.querySelector(".cll-print-header")).not.toBeNull();
+  });
 });
