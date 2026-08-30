@@ -4,6 +4,8 @@ import {
   createEmptyState,
   toggleDeskAt,
   assignStudentAt,
+  createTableAt,
+  setTableStudentAt,
 } from "../src/model.js";
 
 // A one-desk state with an assigned, levelled student — enough to observe
@@ -96,5 +98,15 @@ describe("buildPrintSheet", () => {
   it("badge font defaults to 8px (levelFit.max default)", () => {
     const sheet = buildPrintSheet(oneDeskState());
     expect(sheet.querySelector(".cll-desk-level").style.fontSize).toBe("8px");
+  });
+
+  it("renders round / oval tables and their label", () => {
+    let s = createTableAt(createEmptyState({ cols: 4, rows: 4 }), 1, 1, 2, 3);
+    s = setTableStudentAt(s, "1_1", { name: "Groupe A", level: "CE1" });
+    const sheet = buildPrintSheet(s);
+    const table = sheet.querySelector(".cll-table");
+    expect(table).not.toBeNull();
+    expect(table.classList.contains("cll-table--oval")).toBe(true);
+    expect(sheet.querySelector(".cll-table-name").textContent).toBe("Groupe A");
   });
 });

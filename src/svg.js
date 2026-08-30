@@ -72,6 +72,36 @@ export function buildDeskSvg({ occupied, stuck }) {
   return svg;
 }
 
+// Round / oval table seen from above. Authored in a 0..100 square; the host
+// element (see renderGrid, src/render.js) is sized to the table's cell
+// footprint and stretches this via preserveAspectRatio="none" — so a square
+// footprint stays a circle and a w≠h footprint becomes the matching oval,
+// no per-shape geometry needed here. `shape` only drives the class. Unlike a
+// desk it has no chair — a single seated figure marks it when occupied.
+export function buildTableSvg({ occupied, shape }) {
+  const svg = el("svg", {
+    viewBox: "0 0 100 100",
+    preserveAspectRatio: "none",
+    class: `cll-table-svg cll-table-svg--${shape === "round" ? "round" : "oval"}`,
+    "aria-hidden": "true",
+  });
+  svg.appendChild(
+    el("ellipse", { cx: 50, cy: 50, rx: 47, ry: 47, class: "cll-table-top" }),
+  );
+  svg.appendChild(
+    el("ellipse", { cx: 50, cy: 50, rx: 41, ry: 41, class: "cll-table-inner" }),
+  );
+  if (occupied) {
+    svg.appendChild(
+      el("ellipse", { cx: 50, cy: 56, rx: 13, ry: 9, class: "cll-figure" }),
+    );
+    svg.appendChild(
+      el("circle", { cx: 50, cy: 46, r: 8, class: "cll-figure" }),
+    );
+  }
+  return svg;
+}
+
 // Border objects (tableau/porte/fenetre) are drawn on a wide "lane" — the
 // full width of the border segment they occupy (see render.js: the edge
 // zone itself is widened to spill ~5% into each neighboring cell) — always
