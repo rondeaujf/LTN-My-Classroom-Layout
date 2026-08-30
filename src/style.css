@@ -30,8 +30,13 @@
    flex/grid ancestor instead of only ever growing to content size. */
 .cll-grid-host {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  /* `safe` : quand la molette zoome au-delà de la boîte (fitGridToHost *
+     zoom, cf. src/render.js), le centrage flex empêcherait sinon de faire
+     défiler jusqu'au coin haut/gauche. overflow:auto = pan du plan zoomé
+     sans toucher au défilement de la page hôte. */
+  justify-content: safe center;
+  align-items: safe center;
+  overflow: auto;
   min-height: 0;
 }
 
@@ -578,6 +583,68 @@
 .cll-toolbar button:hover {
   background: #fff;
   color: var(--cll-toolbar-blue, #2c3e50);
+}
+
+/* ---- Settings panel (toolbar) ---- */
+/* Bloc « Paramètres » : bouton + panneau déroulant en absolute, pour ne PAS
+   réduire la grille en s'ouvrant (contrairement à un panneau en flux qui
+   grandirait la barre d'outils). Réglages appliqués à chaud, non persistés. */
+.cll-settings {
+  position: relative;
+}
+
+.cll-settings-caret {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.cll-settings-toggle[aria-expanded="true"] .cll-settings-caret {
+  transform: rotate(180deg);
+}
+
+/* Visibilité pilotée par la classe .is-open (et non l'attribut [hidden] +
+   display:grid : à spécificité égale, la règle auteur l'emporterait sur le
+   [hidden]{display:none} de la feuille UA, panneau toujours visible). */
+.cll-settings-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  gap: 8px;
+  min-width: 220px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+.cll-settings-panel.is-open {
+  display: grid;
+}
+
+.cll-settings-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cll-toolbar-blue, #2c3e50);
+}
+
+.cll-settings-field select,
+.cll-settings-field input[type="number"] {
+  padding: 3px 6px;
+  border: 1px solid var(--cll-toolbar-blue, #2c3e50);
+  border-radius: 4px;
+  color: var(--cll-toolbar-blue, #2c3e50);
+  font: inherit;
+}
+
+.cll-settings-field input[type="number"] {
+  width: 4em;
 }
 
 /* ---- Print ---- */
