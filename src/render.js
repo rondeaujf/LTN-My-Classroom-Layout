@@ -111,7 +111,7 @@ function el(tag, { className, attrs, text } = {}) {
 // `max` is a fixed standard size, not a per-name ceiling to grow into: a
 // short name stays at `max`, never rendering larger than a neighboring
 // desk's long, shrunk one — only ever shrinks down from it, never up.
-function fitText(node, { max = 12, min = 7 } = {}) {
+function fitText(node, { max = 12, min = 5 } = {}) {
   let size = max;
   node.style.fontSize = `${size}px`;
   while (
@@ -128,7 +128,7 @@ function fitText(node, { max = 12, min = 7 } = {}) {
 // standard (jamais dépassée) ; le badge ne fait que rétrécir de là vers `min`
 // quand il chevaucherait le nom. Surchargeable via options.levelFit
 // (cf. ClassroomLayout, src/index.js) — même principe que nameFit pour le nom.
-const LEVEL_FIT_DEFAULT = { max: 8, min: 7 };
+const LEVEL_FIT_DEFAULT = { max: 8, min: 5 };
 
 function resolveLevelFit(levelFit = {}) {
   return {
@@ -178,20 +178,34 @@ function avoidLevelNameOverlap(
   }
 }
 
+// Best-effort split of a pre-joined `name` ("Alan Turing" -> first "Alan",
+// last "Turing") for a student that has no explicit firstName/lastName —
+// e.g. a desk assigned & persisted by an older version, or any host that
+// only supplies `name`. First whitespace-run splits first name from the
+// rest; a single token has no last name.
+function splitName(name) {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length < 2) return { first: parts[0] ?? "", last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
 // nameDisplay: "full" (default) - firstName + lastName, or the roster's own
-// pre-joined `name` if that's all it has; "firstName"/"lastName" - just that
-// field when the student actually has it (assignStudentAt/studentPicker.js
-// preserve firstName/lastName separately for exactly this), falling back to
-// "full" behavior otherwise (e.g. a roster entry with only `.name`, no
-// split fields, can't be trimmed to just one part of it).
+// pre-joined `name`; "firstName"/"lastName" - just that part. Uses the
+// explicit firstName/lastName when present (assignStudentAt/studentPicker.js
+// preserve them separately for exactly this), else falls back to splitting
+// `name` so the distinction still works on students stored with only a
+// joined `name`.
 function studentLabel(student, nameDisplay = "full") {
   if (!student) return "";
-  if (nameDisplay === "firstName" && student.firstName)
-    return student.firstName;
-  if (nameDisplay === "lastName" && student.lastName) return student.lastName;
+  const first = student.firstName || splitName(student.name).first;
+  const last = student.lastName || splitName(student.name).last;
+  if (nameDisplay === "firstName" && first) return first;
+  if (nameDisplay === "lastName" && last) return last;
   if (student.name) return student.name;
-  const parts = [student.firstName, student.lastName].filter(Boolean);
-  return parts.join(" ");
+  return [first, last].filter(Boolean).join(" ");
 }
 
 function buildCell(row, col, cell, options) {
@@ -342,7 +356,7 @@ export function renderGrid(container, state, options = {}) {
   }
 
   container.appendChild(grid);
-  fitGridToHost(container, grid);
+  fitGridToHost(container, grid, options.zoom);
   finalizeLayout(grid, options);
   return grid;
 }
@@ -365,15 +379,20 @@ export function renderGrid(container, state, options = {}) {
  * demo, normal document flow): container's height there already comes
  * from the grid's own CSS-computed (already square) size, so the
  * recomputed cellSize matches what's already there — a harmless no-op.
+ *
+ * `zoom` (default 1) multiplies the fitted size — the wheel-zoom on the
+ * grid host (see #onGridWheel, src/index.js). >1 overflows the host, which
+ * is `overflow:auto` (see style.css) so the user can pan the zoomed plan;
+ * <1 just makes it smaller, still centered.
  */
-export function fitGridToHost(container, grid) {
+export function fitGridToHost(container, grid, zoom = 1) {
   const cols = Number(grid.style.getPropertyValue("--cll-cols"));
   const rows = Number(grid.style.getPropertyValue("--cll-rows"));
   const hostWidth = container.clientWidth;
   const hostHeight = container.clientHeight;
   if (!cols || !rows || !hostWidth || !hostHeight) return;
 
-  const cellSize = Math.min(hostWidth / cols, hostHeight / rows);
+  const cellSize = Math.min(hostWidth / cols, hostHeight / rows) * (zoom || 1);
   grid.style.width = `${cellSize * cols}px`;
   grid.style.height = `${cellSize * rows}px`;
 }

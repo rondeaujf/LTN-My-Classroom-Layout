@@ -164,10 +164,30 @@ describe("studentLabel", () => {
     ).toBe("Lovelace");
   });
 
-  it('nameDisplay "firstName" falls back to the full name when there is no split (only `.name`)', () => {
-    expect(studentLabel({ name: "Ada Lovelace" }, "firstName")).toBe(
-      "Ada Lovelace",
+  it('nameDisplay "firstName" splits a joined `.name` when there is no explicit firstName', () => {
+    expect(studentLabel({ name: "Ada Lovelace" }, "firstName")).toBe("Ada");
+  });
+
+  it('nameDisplay "lastName" splits a joined `.name` (everything after the first token)', () => {
+    expect(studentLabel({ name: "Ada King Lovelace" }, "lastName")).toBe(
+      "King Lovelace",
     );
+  });
+
+  it("a single-token `.name` has no last name to trim to (falls back to the name)", () => {
+    expect(studentLabel({ name: "Récréation" }, "lastName")).toBe("Récréation");
+    expect(studentLabel({ name: "Récréation" }, "firstName")).toBe(
+      "Récréation",
+    );
+  });
+
+  it("explicit firstName/lastName still win over a joined `.name`", () => {
+    expect(
+      studentLabel(
+        { firstName: "Ada", lastName: "Lovelace", name: "WRONG WRONG" },
+        "firstName",
+      ),
+    ).toBe("Ada");
   });
 
   it("empty string for no student", () => {
@@ -253,5 +273,33 @@ describe("fitGridToHost", () => {
     fitGridToHost(host, grid);
     expect(grid.style.width).toBe("");
     expect(grid.style.height).toBe("");
+  });
+
+  it("zoom multiplies the fitted size (wheel zoom, src/index.js)", () => {
+    const grid = fakeGrid(5, 6);
+    fitGridToHost(fakeHost(500, 1200), grid, 2);
+    expect(grid.style.width).toBe("1000px"); // 500 * 2
+    expect(grid.style.height).toBe("1200px"); // 600 * 2
+  });
+
+  it("zoom < 1 shrinks it; default zoom (1 / undefined) is unchanged", () => {
+    const half = fakeGrid(5, 6);
+    fitGridToHost(fakeHost(500, 1200), half, 0.5);
+    expect(half.style.width).toBe("250px");
+
+    const plain = fakeGrid(5, 6);
+    fitGridToHost(fakeHost(500, 1200), plain);
+    expect(plain.style.width).toBe("500px");
+  });
+
+  it("keeps cells square at any zoom", () => {
+    for (const zoom of [0.4, 1, 2.5]) {
+      const grid = fakeGrid(5, 6);
+      fitGridToHost(fakeHost(900, 700), grid, zoom);
+      expect(parseFloat(grid.style.width) / 5).toBeCloseTo(
+        parseFloat(grid.style.height) / 6,
+        6,
+      );
+    }
   });
 });

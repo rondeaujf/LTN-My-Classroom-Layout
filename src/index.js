@@ -21,6 +21,16 @@ export class ClassroomLayout {
   #detachInteractions;
   #saveTimer;
   #resizeObserver;
+  // Réglages modifiables à chaud via le panneau « Paramètres » de la barre
+  // d'outils. Initialisés depuis `options` à la construction, NON persistés :
+  // rouvrir le module repart des valeurs de l'hôte.
+  #settings;
+  // levelFit.max suit nameFit.max au ratio initial (défaut 8/12 ≈ 0.67) quand
+  // l'utilisateur règle la taille de police du nom dans le panneau.
+  #levelNameRatio;
+  // Facteur de zoom molette (survol de la grille). Session uniquement.
+  #zoom = 1;
+  #gridWheelHandler;
 
   /**
    * @param {string|Element} container
@@ -35,11 +45,16 @@ export class ClassroomLayout {
    * @param {string} [options.logoUrl] optional host-app logo, shown at the bottom of the print/PDF sheet (mirrors the site's other PDF exports)
    * @param {boolean} [options.showLevel] whether to show the student's level badge on the desk (default true)
    * @param {"full"|"firstName"|"lastName"} [options.nameDisplay] which part of the student's name to show on the desk (default "full")
-   * @param {{max?:number, min?:number}} [options.nameFit] px bounds for the desk name's automatic size-down (default {max:12, min:7})
-   * @param {{max?:number, min?:number}} [options.levelFit] px bounds for the level badge's font (default {max:8, min:7}) — max is the standard size, the badge only ever shrinks from it (down to min) to clear the name
+   * @param {{max?:number, min?:number}} [options.nameFit] px bounds for the desk name's automatic size-down (default {max:12, min:5})
+   * @param {{max?:number, min?:number}} [options.levelFit] px bounds for the level badge's font (default {max:8, min:5}) — max is the standard size, the badge only ever shrinks from it (down to min) to clear the name
    * @param {"portrait"|"landscape"} [options.printOrientation] page orientation for print / PDF export (default "portrait")
    * @param {string} [options.printPaper] paper size for print / PDF export, e.g. "A4" (default), "A3", "letter"
    * @param {boolean} [options.editableBorders] whether wall/board/door/window border objects can be added, changed or removed (default true) — false locks them, desks stay editable
+   *
+   * The values above marked as such (printOrientation, nameDisplay, showLevel,
+   * editableBorders, nameFit.max) are the *initial* values of the toolbar's
+   * "Paramètres" panel, where the user can change them for the session (not
+   * persisted). The mouse wheel over the grid zooms it in/out.
    */
   constructor(container, options = {}) {
     this.#container =
@@ -50,9 +65,34 @@ export class ClassroomLayout {
       throw new Error("ClassroomLayout: conteneur introuvable");
     }
     this.#options = options;
+
+    const nameMax = options.nameFit?.max ?? 12;
+    const levelMax = options.levelFit?.max ?? 8;
+    this.#levelNameRatio = nameMax > 0 ? levelMax / nameMax : 0.64;
+    this.#settings = {
+      printOrientation: options.printOrientation ?? "portrait",
+      nameDisplay: options.nameDisplay ?? "full",
+      showLevel: options.showLevel !== false,
+      editableBorders: options.editableBorders !== false,
+      nameFit: { max: nameMax, min: options.nameFit?.min ?? 5 },
+      levelFit: { max: levelMax, min: options.levelFit?.min ?? 5 },
+    };
+
     this.#state = createEmptyState(options.gridDefault);
     this.#buildDom();
     this.ready = this.#load();
+  }
+
+  /** Applique un patch de réglages (panneau « Paramètres ») et re-rend. Pas de persistance. */
+  #applySetting(patch) {
+    Object.assign(this.#settings, patch);
+    this.#render();
+  }
+
+  /** Re-dimensionne la grille au zoom courant (molette). No-op si pas encore rendue. */
+  #refitGrid() {
+    const grid = this.#gridHost?.querySelector(".cll-grid");
+    if (grid) fitGridToHost(this.#gridHost, grid, this.#zoom);
   }
 
   #buildDom() {
@@ -76,10 +116,17 @@ export class ClassroomLayout {
     printBtn.textContent = "Imprimer / Export PDF";
     printBtn.addEventListener("click", () => this.print());
 
-    toolbar.append(this.#subtitleInput, printBtn);
+    toolbar.append(this.#subtitleInput, this.#buildSettings(), printBtn);
 
     this.#gridHost = document.createElement("div");
     this.#gridHost.className = "cll-grid-host";
+    // Molette au survol de la grille = zoom. `{ passive: false }` pour pouvoir
+    // preventDefault() : sinon la molette ferait défiler la page / le dialog
+    // hôte au lieu de zoomer.
+    this.#gridWheelHandler = (e) => this.#onGridWheel(e);
+    this.#gridHost.addEventListener("wheel", this.#gridWheelHandler, {
+      passive: false,
+    });
 
     this.#root.append(toolbar, this.#gridHost);
     this.#container.appendChild(this.#root);
@@ -88,12 +135,188 @@ export class ClassroomLayout {
     // own box changes shape — a state change already re-fits as part of
     // #render(), but the host can just as well be reshaped on its own
     // (e.g. the user resizing a host app's dialog) without the state
-    // changing at all.
-    this.#resizeObserver = new ResizeObserver(() => {
-      const grid = this.#gridHost.querySelector(".cll-grid");
-      if (grid) fitGridToHost(this.#gridHost, grid);
-    });
+    // changing at all. Keeps the current wheel zoom.
+    this.#resizeObserver = new ResizeObserver(() => this.#refitGrid());
     this.#resizeObserver.observe(this.#gridHost);
+  }
+
+  /**
+   * Barre d'outils : bloc « Paramètres » repliable (sous le sous-titre).
+   * Réglages appliqués à chaud, non persistés (cf. #settings).
+   */
+  #buildSettings() {
+    const wrap = document.createElement("div");
+    wrap.className = "cll-settings";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "cll-settings-toggle";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.innerHTML =
+      'Paramètres <span class="cll-settings-caret" aria-hidden="true">▾</span>';
+
+    const panel = document.createElement("div");
+    panel.className = "cll-settings-panel";
+
+    toggle.addEventListener("click", () => {
+      const open = panel.classList.toggle("is-open");
+      toggle.setAttribute("aria-expanded", String(open));
+    });
+
+    const field = (labelText, control) => {
+      const label = document.createElement("label");
+      label.className = "cll-settings-field";
+      label.append(
+        Object.assign(document.createElement("span"), {
+          textContent: labelText,
+        }),
+        control,
+      );
+      return label;
+    };
+
+    const select = (options, value, onChange) => {
+      const el = document.createElement("select");
+      for (const [v, text] of options) {
+        el.append(new Option(text, v, false, v === value));
+      }
+      el.addEventListener("change", () => onChange(el.value));
+      return el;
+    };
+
+    const checkbox = (checked, onChange) => {
+      const el = document.createElement("input");
+      el.type = "checkbox";
+      el.checked = checked;
+      el.addEventListener("change", () => onChange(el.checked));
+      return el;
+    };
+
+    // Orientation
+    panel.append(
+      field(
+        "Orientation",
+        select(
+          [
+            ["portrait", "Portrait"],
+            ["landscape", "Paysage"],
+          ],
+          this.#settings.printOrientation,
+          (v) => this.#applySetting({ printOrientation: v }),
+        ),
+      ),
+    );
+
+    // Type de nom
+    panel.append(
+      field(
+        "Type de nom",
+        select(
+          [
+            ["full", "Nom complet"],
+            ["firstName", "Prénom"],
+            ["lastName", "Nom"],
+          ],
+          this.#settings.nameDisplay,
+          (v) => this.#applySetting({ nameDisplay: v }),
+        ),
+      ),
+    );
+
+    // Badges de niveau
+    panel.append(
+      field(
+        "Badges de niveau",
+        checkbox(this.#settings.showLevel, (v) =>
+          this.#applySetting({ showLevel: v }),
+        ),
+      ),
+    );
+
+    // Bordures modifiables
+    panel.append(
+      field(
+        "Bordures modifiables",
+        checkbox(this.#settings.editableBorders, (v) =>
+          this.#applySetting({ editableBorders: v }),
+        ),
+      ),
+    );
+
+    // Taille de police du nom — le badge suit au ratio initial.
+    const fontInput = document.createElement("input");
+    fontInput.type = "number";
+    fontInput.min = "5";
+    fontInput.max = "24";
+    fontInput.step = "1";
+    fontInput.value = String(this.#settings.nameFit.max);
+    fontInput.addEventListener("change", () => {
+      const v = Math.max(5, Math.min(24, Math.round(Number(fontInput.value))));
+      fontInput.value = String(v);
+      this.#applySetting({
+        nameFit: { ...this.#settings.nameFit, max: v },
+        levelFit: {
+          ...this.#settings.levelFit,
+          max: Math.max(5, Math.round(v * this.#levelNameRatio)),
+        },
+      });
+    });
+    panel.append(field("Taille du nom (px)", fontInput));
+
+    wrap.append(toggle, panel);
+    return wrap;
+  }
+
+  /** Facteur de zoom molette courant (1 = grille ajustée avec sa couronne vide). */
+  get zoom() {
+    return this.#zoom;
+  }
+
+  /**
+   * Molette sur la grille : zoom in/out **vers la cellule sous le pointeur**
+   * (cette cellule reste sous le curseur), sans laisser défiler la page/le
+   * dialog.
+   *
+   * On ré-ancre sur l'indice de la cellule (fraction propre de la grille), pas
+   * sur un point de scroll relu à chaque cran : relire scrollLeft/scrollTop
+   * accumule l'erreur de clamp (bords, zoom ≈ 1) et fait dériver la vue.
+   *
+   * Plancher à 1 : à 1 la grille occupe déjà toute la boîte (fitGridToHost) —
+   * c'est la vue « couronne extérieure vide » complète, on ne dézoome jamais
+   * plus (la grille ne rétrécit pas au-delà). Plafond à 5.
+   */
+  #onGridWheel(e) {
+    e.preventDefault();
+    const grid = this.#gridHost.querySelector(".cll-grid");
+    if (!grid) return;
+
+    const oldZoom = this.#zoom;
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    const newZoom = Math.min(5, Math.max(1, oldZoom * factor));
+    if (newZoom === oldZoom) return;
+    this.#zoom = newZoom;
+
+    const cell = e.target.closest?.(".cll-cell");
+    const host = this.#gridHost;
+    const rect = host.getBoundingClientRect();
+    const pointerX = e.clientX - rect.left;
+    const pointerY = e.clientY - rect.top;
+
+    this.#refitGrid();
+
+    // Amène le centre de la cellule visée sous le curseur (position écran
+    // inchangée). Recalculé de zéro à partir de son indice -> pas de dérive.
+    // Le navigateur clampe si aucun débordement (rien à faire de plus).
+    if (cell) {
+      const cols = Number(grid.style.getPropertyValue("--cll-cols")) || 1;
+      const rows = Number(grid.style.getPropertyValue("--cll-rows")) || 1;
+      const gw = parseFloat(grid.style.width) || 0;
+      const gh = parseFloat(grid.style.height) || 0;
+      const cellCenterX = ((Number(cell.dataset.col) + 0.5) / cols) * gw;
+      const cellCenterY = ((Number(cell.dataset.row) + 0.5) / rows) * gh;
+      host.scrollLeft = cellCenterX - pointerX;
+      host.scrollTop = cellCenterY - pointerY;
+    }
   }
 
   async #load() {
@@ -116,22 +339,24 @@ export class ClassroomLayout {
   #render() {
     // false = bords (mur/tableau/porte/fenêtre) verrouillés : la classe coupe
     // l'affordance CSS (cf. style.css) et attachInteractions ignore les clics
-    // sur .cll-edge.
+    // sur .cll-edge. Lu depuis #settings (panneau), pas des options brutes.
     this.#root.classList.toggle(
       "cll-root--borders-locked",
-      this.#options.editableBorders === false,
+      this.#settings.editableBorders === false,
     );
     const gridEl = renderGrid(this.#gridHost, this.#state, {
-      nameFit: this.#options.nameFit,
-      levelFit: this.#options.levelFit,
-      showLevel: this.#options.showLevel,
-      nameDisplay: this.#options.nameDisplay,
+      nameFit: this.#settings.nameFit,
+      levelFit: this.#settings.levelFit,
+      showLevel: this.#settings.showLevel,
+      nameDisplay: this.#settings.nameDisplay,
+      zoom: this.#zoom,
     });
     this.#detachInteractions?.();
     this.#detachInteractions = attachInteractions(gridEl, {
       getState: () => this.#state,
       applyChange: (fn) => this.applyChange(fn),
-      options: this.#options,
+      // #settings passe après #options : editableBorders du panneau prime.
+      options: { ...this.#options, ...this.#settings },
       hostEl: this.#root,
     });
   }
@@ -170,17 +395,18 @@ export class ClassroomLayout {
 
   print() {
     const teacher = this.#options.teacher ?? this.#state.teacherOverride;
-    // Réglages d'impression transmis tels quels : la même charge utile part
-    // vers onPrint (l'hôte les applique dans son propre moteur PDF) et vers le
-    // printLayout intégré (dialogue navigateur).
+    // Réglages d'impression EFFECTIFS (panneau « Paramètres » compris) : la même
+    // charge utile part vers onPrint (l'hôte les applique dans son propre moteur
+    // PDF) et vers le printLayout intégré (dialogue navigateur). printPaper
+    // n'est pas dans le panneau -> lu depuis les options.
     const printOpts = {
       teacher,
       logoUrl: this.#options.logoUrl,
-      showLevel: this.#options.showLevel,
-      nameDisplay: this.#options.nameDisplay,
-      nameFit: this.#options.nameFit,
-      levelFit: this.#options.levelFit,
-      printOrientation: this.#options.printOrientation,
+      showLevel: this.#settings.showLevel,
+      nameDisplay: this.#settings.nameDisplay,
+      nameFit: this.#settings.nameFit,
+      levelFit: this.#settings.levelFit,
+      printOrientation: this.#settings.printOrientation,
       printPaper: this.#options.printPaper,
     };
     if (this.#options.onPrint) {
@@ -197,6 +423,7 @@ export class ClassroomLayout {
     this.#flushSave();
     this.#detachInteractions?.();
     this.#resizeObserver?.disconnect();
+    this.#gridHost?.removeEventListener("wheel", this.#gridWheelHandler);
     this.#container.replaceChildren();
   }
 }

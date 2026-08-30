@@ -624,9 +624,214 @@ describe("levelFit / print settings", () => {
     layout.print();
 
     const [, opts] = onPrint.mock.calls[0];
-    expect(opts.nameFit).toEqual({ max: 11 });
-    expect(opts.levelFit).toEqual({ max: 7 });
+    // onPrint now gets the effective (panel-aware) settings — the fit objects
+    // come back normalized with their `min` (default 5).
+    expect(opts.nameFit).toEqual({ max: 11, min: 5 });
+    expect(opts.levelFit).toEqual({ max: 7, min: 5 });
     expect(opts.printOrientation).toBe("landscape");
     expect(opts.printPaper).toBe("A4");
+  });
+});
+
+describe("wheel zoom", () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  const wheel = (host, deltaY) => {
+    const ev = new WheelEvent("wheel", {
+      deltaY,
+      bubbles: true,
+      cancelable: true,
+    });
+    host.dispatchEvent(ev);
+    return ev;
+  };
+
+  it("wheel over the grid host is preventDefault'd (no page/dialog scroll)", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    expect(
+      wheel(container.querySelector(".cll-grid-host"), -120).defaultPrevented,
+    ).toBe(true);
+  });
+
+  it("starts at zoom 1 and never dezooms below it (fitted view = floor)", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const host = container.querySelector(".cll-grid-host");
+    expect(layout.zoom).toBe(1);
+
+    for (let i = 0; i < 5; i++) wheel(host, 120); // wheel down = zoom out
+    expect(layout.zoom).toBe(1);
+  });
+
+  it("wheel up zooms in, capped at 5", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const host = container.querySelector(".cll-grid-host");
+
+    wheel(host, -120);
+    expect(layout.zoom).toBeGreaterThan(1);
+
+    for (let i = 0; i < 60; i++) wheel(host, -120);
+    expect(layout.zoom).toBe(5);
+
+    // and back down, floored at 1
+    for (let i = 0; i < 60; i++) wheel(host, 120);
+    expect(layout.zoom).toBe(1);
+  });
+
+  it("zooming with the pointer over a cell re-anchors on that cell without throwing", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const cell = container.querySelector('[data-row="2"][data-col="3"]');
+    // jsdom has no layout engine (rects/scroll are 0), so this exercises the
+    // cell-anchor branch — it must read the cell's row/col and not throw.
+    expect(() => wheel(cell, -120)).not.toThrow();
+    expect(layout.zoom).toBeGreaterThan(1);
+  });
+});
+
+describe("Paramètres panel", () => {
+  let container;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  const field = (root, labelText, sel) => {
+    const f = [...root.querySelectorAll(".cll-settings-field")].find(
+      (el) => el.querySelector("span")?.textContent === labelText,
+    );
+    return f?.querySelector(sel);
+  };
+
+  const levelledDesk = (layout) =>
+    layout.applyChange((s) => ({
+      ...s,
+      cells: {
+        "0_0": {
+          type: "desk",
+          rotation: 0,
+          color: null,
+          student: { firstName: "Ada", level: "CE2" },
+        },
+      },
+    }));
+
+  it("toggle shows/hides the panel", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const toggle = container.querySelector(".cll-settings-toggle");
+    const panel = container.querySelector(".cll-settings-panel");
+    // Closed by default: no .is-open (CSS: .cll-settings-panel { display:none }).
+    expect(panel.classList.contains("is-open")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    click(toggle);
+    expect(panel.classList.contains("is-open")).toBe(true);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+
+    click(toggle);
+    expect(panel.classList.contains("is-open")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("controls start from the constructor options", async () => {
+    const layout = new ClassroomLayout(container, {
+      printOrientation: "landscape",
+      nameDisplay: "firstName",
+      showLevel: false,
+      editableBorders: false,
+      nameFit: { max: 11 },
+    });
+    await layout.ready;
+    const root = container;
+    expect(field(root, "Orientation", "select").value).toBe("landscape");
+    expect(field(root, "Type de nom", "select").value).toBe("firstName");
+    expect(field(root, "Badges de niveau", "input").checked).toBe(false);
+    expect(field(root, "Bordures modifiables", "input").checked).toBe(false);
+    expect(field(root, "Taille du nom (px)", "input").value).toBe("11");
+  });
+
+  it("orientation select feeds the effective settings passed to onPrint", async () => {
+    const onPrint = vi.fn();
+    const layout = new ClassroomLayout(container, {
+      printOrientation: "portrait",
+      onPrint,
+    });
+    await layout.ready;
+    const sel = field(container, "Orientation", "select");
+    sel.value = "landscape";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+
+    layout.print();
+    expect(onPrint.mock.calls[0][1].printOrientation).toBe("landscape");
+  });
+
+  it("badges toggle adds/removes the level badge live", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    levelledDesk(layout);
+    expect(container.querySelector(".cll-desk-level")).not.toBeNull();
+
+    const cb = field(container, "Badges de niveau", "input");
+    cb.checked = false;
+    cb.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(container.querySelector(".cll-desk-level")).toBeNull();
+  });
+
+  it("borders toggle locks/unlocks border editing live", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const root = container.querySelector(".cll-root");
+    expect(root.classList.contains("cll-root--borders-locked")).toBe(false);
+
+    const cb = field(container, "Bordures modifiables", "input");
+    cb.checked = false;
+    cb.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(
+      container
+        .querySelector(".cll-root")
+        .classList.contains("cll-root--borders-locked"),
+    ).toBe(true);
+
+    click(
+      container.querySelector('.cll-edge[data-edge-key="h_0_0"]'),
+      "contextmenu",
+    );
+    expect(document.querySelector(".cll-borderpicker-btn")).toBeNull();
+  });
+
+  it("font control drives the name font; the badge follows at the initial ratio, floored at 5", async () => {
+    const layout = new ClassroomLayout(container, {
+      nameFit: { max: 12 },
+      levelFit: { max: 6 }, // ratio 0.5
+    });
+    await layout.ready;
+    levelledDesk(layout);
+
+    const input = field(container, "Taille du nom (px)", "input");
+    input.value = "16";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(container.querySelector(".cll-desk-name").style.fontSize).toBe(
+      "16px",
+    );
+    expect(container.querySelector(".cll-desk-level").style.fontSize).toBe(
+      "8px",
+    );
+
+    input.value = "5";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    // 5 * 0.5 = 2.5 -> would round to 3, floored to 5
+    expect(container.querySelector(".cll-desk-level").style.fontSize).toBe(
+      "5px",
+    );
   });
 });
