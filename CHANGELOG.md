@@ -4,6 +4,12 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.3.1
+
+- Docs only: `homepage` now points to the live demo
+  (<https://jfrondeau.fr/projects/classroom-layout/>); README gains a
+  demo / repository link line. No runtime change.
+
 ## 1.3.0
 
 - `options.pdfChrome` (default `true`) / `buildPrintSheet(state, { chrome })`

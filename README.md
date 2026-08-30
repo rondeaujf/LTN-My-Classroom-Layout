@@ -1,5 +1,8 @@
 # LTN-My-Classroom-Layout
 
+**[▶ Live demo](https://jfrondeau.fr/projects/classroom-layout/)** ·
+[GitHub repository](https://github.com/rondeaujf/LTN-My-Classroom-Layout)
+
 Standalone JavaScript module (vanilla, no framework dependency) for building
 an **interactive classroom seating chart**: desk grid, rotation and color on
 right-click, student assignment, border objects (wall, board, door, window),
