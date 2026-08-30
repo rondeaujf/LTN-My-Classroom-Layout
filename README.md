@@ -88,6 +88,14 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   entirely with `options.editableBorders: false` — existing borders still
   show, but they can't be added/changed/removed and clicks pass through to
   the desk underneath.
+- **Round / oval tables**: right-click an empty cell → "Créer une table
+  ronde" for a 1-cell table; **click-drag a rectangle** of empty cells (then
+  confirm in the small menu that pops up) for a bigger one — square
+  footprint → round, elongated → oval. A table carries one label + one level
+  badge, exactly like a desk (right-click it to assign a student, set a
+  color, or delete it; left-click removes the student, then the table). A
+  plain click without dragging still just adds a desk. `state.tables`, keyed
+  by the top-left cell's `row_col`.
 - **Assign a student**: list of students without a desk yet (if
   `options.students` is supplied), with search, or "Ajouter un label" — a
   dialog (styled after the host site's own, not the picker's small anchored
@@ -238,6 +246,16 @@ internally.
       "flip": false, // "retourner" — door or tableau, across the wall (independent of rotation)
     },
     "v_3_5": { "type": "fenetre", "rotation": 0 },
+  },
+  "tables": {
+    // key = "row_col" of the top-left cell of the table's w×h footprint
+    "2_3": {
+      "w": 2,
+      "h": 3,
+      "shape": "oval", // "round" when w === h, else "oval"
+      "color": "#81b29a", // or null
+      "student": { "id": "1", "name": "Groupe A", "level": "CE1" }, // or null
+    },
   },
   "recentColors": ["#e07a5f"], // custom colors the user recently picked
   "subtitle": "Back to school 2026",

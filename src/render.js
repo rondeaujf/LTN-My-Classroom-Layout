@@ -1,11 +1,17 @@
 import {
   cellKey,
+  parseCellKey,
   hEdgeKey,
   vEdgeKey,
   BORDER_TYPES,
   isRoomEnclosed,
 } from "./model.js";
-import { buildDeskSvg, buildBorderIcon, DESK_TOP_MARGIN } from "./svg.js";
+import {
+  buildDeskSvg,
+  buildTableSvg,
+  buildBorderIcon,
+  DESK_TOP_MARGIN,
+} from "./svg.js";
 
 // Screen-absolute — see setDeskHalfShiftAt (src/model.js) and the transform
 // composition note in buildCell below.
@@ -291,6 +297,42 @@ function buildBorderZone(edgeKey, orientation, edge, geometry) {
   return zone;
 }
 
+// A round / oval table: an absolutely-positioned box over its w×h cell
+// footprint (like a border zone, but a rectangle of cells), on top of the
+// cells (z-index, see style.css) so it captures its own clicks. Carries a
+// single name + level badge, same as a desk.
+function buildTable(key, table, cols, rows, options) {
+  const { row, col } = parseCellKey(key);
+  const wrap = el("div", {
+    className: `cll-table cll-table--${table.shape}`,
+    attrs: { "data-table-key": key, "data-w": table.w, "data-h": table.h },
+  });
+  Object.assign(wrap.style, {
+    left: `${(col / cols) * 100}%`,
+    top: `${(row / rows) * 100}%`,
+    width: `${(table.w / cols) * 100}%`,
+    height: `${(table.h / rows) * 100}%`,
+  });
+  if (table.color) wrap.style.setProperty("--cll-desk-color", table.color);
+  wrap.appendChild(
+    buildTableSvg({ occupied: !!table.student, shape: table.shape }),
+  );
+
+  if (table.student) {
+    const level = table.student.level ?? table.student.niveau ?? "";
+    if (level && options.showLevel !== false) {
+      wrap.appendChild(
+        el("div", { className: "cll-table-level", text: level }),
+      );
+    }
+    const name = studentLabel(table.student, options.nameDisplay);
+    if (name) {
+      wrap.appendChild(el("div", { className: "cll-table-name", text: name }));
+    }
+  }
+  return wrap;
+}
+
 // A border object claims the full width of the cell it's attached to, plus
 // a spill of OVERFLOW into each of the two neighboring cells — it reads as
 // an actual fixture on the wall, not a small marker on the grid line.
@@ -353,6 +395,10 @@ export function renderGrid(container, state, options = {}) {
         }),
       );
     }
+  }
+
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    grid.appendChild(buildTable(key, table, cols, rows, options));
   }
 
   container.appendChild(grid);
@@ -439,6 +485,14 @@ export function finalizeLayout(root, options = {}) {
         levelFit.min,
       );
     }
+  }
+  // Tables : pas de rotation ni de géométrie « plateau » — juste ajuster la
+  // police du libellé et plafonner celle du badge (positionné en CSS, coin).
+  for (const table of root.querySelectorAll(".cll-table")) {
+    const nameEl = table.querySelector(".cll-table-name");
+    if (nameEl) fitText(nameEl, options.nameFit);
+    const levelEl = table.querySelector(".cll-table-level");
+    if (levelEl) levelEl.style.fontSize = `${levelFit.max}px`;
   }
 }
 

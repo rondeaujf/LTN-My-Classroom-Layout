@@ -29,6 +29,9 @@ export function createEmptyState(grid = DEFAULT_GRID) {
     grid: { cols: grid.cols, rows: grid.rows },
     cells: {},
     edges: {},
+    // Round / oval tables spanning a rectangular block of cells — keyed by the
+    // `row_col` of their top-left cell (cf. the `tables` helpers below).
+    tables: {},
     recentColors: [],
     subtitle: "",
     // Only used when the host app doesn't supply `options.teacher` (see
@@ -96,6 +99,13 @@ function growGridToKeepFreeRing(state) {
       if (line === cols) touchesRight = true;
     }
   }
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    const { row, col } = parseCellKey(key);
+    if (row === 0) touchesTop = true;
+    if (row + table.h - 1 === rows - 1) touchesBottom = true;
+    if (col === 0) touchesLeft = true;
+    if (col + table.w - 1 === cols - 1) touchesRight = true;
+  }
 
   if (!touchesTop && !touchesBottom && !touchesLeft && !touchesRight) {
     return state;
@@ -122,13 +132,109 @@ function growGridToKeepFreeRing(state) {
       edges[vEdgeKey(a + rowOffset, b + colOffset)] = edge;
     }
   }
+  const tables = {};
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    const { row, col } = parseCellKey(key);
+    tables[cellKey(row + rowOffset, col + colOffset)] = table;
+  }
 
   return {
     ...state,
     grid: { cols: newCols, rows: newRows },
     cells,
     edges,
+    tables,
   };
+}
+
+// --- Tables (round / oval) -------------------------------------------------
+//
+// A table spans a w×h rectangular block of cells, keyed in `state.tables` by
+// the `row_col` of its top-left cell. Round when w === h, oval otherwise.
+// Like a desk it carries a single `student` (one label + one level badge) and
+// an optional `color`; its footprint cells hold no desk and no other table.
+
+/** The `row_col` keys of every cell a w×h table anchored at (row,col) covers. */
+export function tableFootprintKeys(row, col, w, h) {
+  const keys = [];
+  for (let r = row; r < row + h; r++) {
+    for (let c = col; c < col + w; c++) keys.push(cellKey(r, c));
+  }
+  return keys;
+}
+
+/** The table covering cell (row,col), as `{ key, table }`, or null. */
+export function tableAtCell(state, row, col) {
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    const { row: tr, col: tc } = parseCellKey(key);
+    if (row >= tr && row < tr + table.h && col >= tc && col < tc + table.w) {
+      return { key, table };
+    }
+  }
+  return null;
+}
+
+/** True if cell (row,col) holds a desk or is covered by a table. */
+export function cellOccupied(state, row, col) {
+  return !!state.cells[cellKey(row, col)] || !!tableAtCell(state, row, col);
+}
+
+/**
+ * Adds a round (w === h) / oval table over the w×h block anchored at
+ * (row,col). No-op if the block falls outside the grid or any of its cells
+ * already holds a desk or another table.
+ */
+export function createTableAt(state, row, col, w, h) {
+  if (w < 1 || h < 1) return state;
+  const { rows, cols } = state.grid;
+  if (row < 0 || col < 0 || row + h > rows || col + w > cols) return state;
+  for (const fk of tableFootprintKeys(row, col, w, h)) {
+    const { row: r, col: c } = parseCellKey(fk);
+    if (cellOccupied(state, r, c)) return state;
+  }
+  const key = cellKey(row, col);
+  return touch(
+    growGridToKeepFreeRing({
+      ...state,
+      tables: {
+        ...(state.tables ?? {}),
+        [key]: {
+          w,
+          h,
+          shape: w === h ? "round" : "oval",
+          color: null,
+          student: null,
+        },
+      },
+    }),
+  );
+}
+
+export function removeTableAt(state, key) {
+  if (!state.tables?.[key]) return state;
+  const tables = { ...state.tables };
+  delete tables[key];
+  return touch({ ...state, tables });
+}
+
+export function setTableColorAt(state, key, color) {
+  const table = state.tables?.[key];
+  if (!table) return state;
+  return touch(
+    addRecentColor(
+      { ...state, tables: { ...state.tables, [key]: { ...table, color } } },
+      color,
+    ),
+  );
+}
+
+export function setTableStudentAt(state, key, student) {
+  const table = state.tables?.[key];
+  if (!table) return state;
+  return touch({
+    ...state,
+    tables: { ...state.tables, [key]: { ...table, student } },
+  });
 }
 
 export function toggleDeskAt(state, row, col) {
@@ -312,20 +418,25 @@ export function flipBorderAt(state, edgeKey) {
  * (e.g. a "cll-grid--closed" class, see render.js).
  */
 export function isRoomEnclosed(state) {
-  const deskKeys = Object.keys(state.cells);
-  if (deskKeys.length === 0) return false;
-
   let minR = Infinity;
   let maxR = -Infinity;
   let minC = Infinity;
   let maxC = -Infinity;
-  for (const key of deskKeys) {
+  for (const key of Object.keys(state.cells)) {
     const { row, col } = parseCellKey(key);
     minR = Math.min(minR, row);
     maxR = Math.max(maxR, row);
     minC = Math.min(minC, col);
     maxC = Math.max(maxC, col);
   }
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    const { row, col } = parseCellKey(key);
+    minR = Math.min(minR, row);
+    maxR = Math.max(maxR, row + table.h - 1);
+    minC = Math.min(minC, col);
+    maxC = Math.max(maxC, col + table.w - 1);
+  }
+  if (!Number.isFinite(minR)) return false;
 
   for (let col = minC; col <= maxC; col++) {
     if (!state.edges[hEdgeKey(minR, col)]) return false;
@@ -387,6 +498,13 @@ export function fitGridToContentWithRing(
       maxC = Math.max(maxC, line - 1, line);
     }
   }
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    const { row, col } = parseCellKey(key);
+    minR = Math.min(minR, row);
+    maxR = Math.max(maxR, row + table.h - 1);
+    minC = Math.min(minC, col);
+    maxC = Math.max(maxC, col + table.w - 1);
+  }
 
   if (!Number.isFinite(minR)) {
     return { ...state, grid: { ...fallbackGrid } };
@@ -415,7 +533,13 @@ export function fitGridToContentWithRing(
     }
   }
 
-  return { ...state, grid: { cols, rows }, cells, edges };
+  const tables = {};
+  for (const [key, table] of Object.entries(state.tables ?? {})) {
+    const { row, col } = parseCellKey(key);
+    tables[cellKey(row + rowOffset, col + colOffset)] = table;
+  }
+
+  return { ...state, grid: { cols, rows }, cells, edges, tables };
 }
 
 export function serializeState(state) {
@@ -429,6 +553,7 @@ export function deserializeState(json) {
     grid: parsed.grid ?? { ...DEFAULT_GRID },
     cells: parsed.cells ?? {},
     edges: parsed.edges ?? {},
+    tables: parsed.tables ?? {},
     recentColors: parsed.recentColors ?? [],
     subtitle: parsed.subtitle ?? "",
     teacherOverride: parsed.teacherOverride ?? null,

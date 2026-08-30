@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ClassroomLayout } from "../src/index.js";
+import { createTableAt, setTableStudentAt } from "../src/model.js";
 
 // jsdom doesn't implement ResizeObserver (no real layout engine to observe
 // in the first place) — every real target browser does, so this is a
@@ -833,5 +834,149 @@ describe("Paramètres panel", () => {
     expect(container.querySelector(".cll-desk-level").style.fontSize).toBe(
       "5px",
     );
+  });
+});
+
+describe("round / oval tables", () => {
+  let container;
+
+  beforeEach(() => {
+    document.body.replaceChildren();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  const mouse = (el, type, opts = {}) =>
+    el.dispatchEvent(
+      new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ...opts,
+      }),
+    );
+
+  const menuItems = () =>
+    Array.from(document.querySelectorAll(".cll-menu-item")).map(
+      (li) => li.textContent,
+    );
+
+  it("drag over 2 empty cells then confirm creates an oval table", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const a = container.querySelector('[data-row="2"][data-col="2"]');
+    const b = container.querySelector('[data-row="2"][data-col="3"]');
+
+    mouse(a, "mousedown");
+    mouse(b, "mousemove");
+    mouse(b, "mouseup");
+
+    expect(menuItems()).toEqual(["Créer une table ovale (2×1)"]);
+    document.querySelector(".cll-menu-item").click();
+
+    expect(layout.getState().tables["2_2"]).toMatchObject({
+      w: 2,
+      h: 1,
+      shape: "oval",
+    });
+    expect(container.querySelector(".cll-table")).not.toBeNull();
+  });
+
+  it("a plain click (no drag) still makes a desk, not a table", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const cell = container.querySelector('[data-row="2"][data-col="2"]');
+    mouse(cell, "mousedown");
+    mouse(cell, "mouseup");
+    cell.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    expect(container.querySelectorAll(".cll-cell--desk").length).toBe(1);
+    expect(layout.getState().tables).toEqual({});
+  });
+
+  it("right-click an empty cell offers 'Créer une table ronde' (1×1)", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const cell = container.querySelector('[data-row="1"][data-col="1"]');
+    cell.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+    );
+    expect(menuItems()).toContain("Créer une table ronde");
+    Array.from(document.querySelectorAll(".cll-menu-item"))
+      .find((li) => li.textContent === "Créer une table ronde")
+      .click();
+    expect(layout.getState().tables["1_1"]).toMatchObject({
+      w: 1,
+      h: 1,
+      shape: "round",
+    });
+  });
+
+  it("right-click a table opens its own menu", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) => createTableAt(s, 1, 1, 2, 2));
+
+    container
+      .querySelector(".cll-table")
+      .dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    const items = menuItems();
+    expect(items).toContain("Affecter un élève…");
+    expect(items).toContain("Couleur…");
+    expect(items).toContain("Supprimer la table");
+  });
+
+  it("a table shows its student's label and level badge", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) =>
+      setTableStudentAt(createTableAt(s, 1, 1, 2, 2), "1_1", {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        level: "CE2",
+      }),
+    );
+    expect(container.querySelector(".cll-table-name").textContent).toBe(
+      "Ada Lovelace",
+    );
+    expect(container.querySelector(".cll-table-level").textContent).toBe("CE2");
+  });
+
+  it("options.showLevel: false hides the table's badge too", async () => {
+    const layout = new ClassroomLayout(container, { showLevel: false });
+    await layout.ready;
+    layout.applyChange((s) =>
+      setTableStudentAt(createTableAt(s, 1, 1, 2, 2), "1_1", {
+        firstName: "Ada",
+        level: "CE2",
+      }),
+    );
+    expect(container.querySelector(".cll-table-name").textContent).toBe("Ada");
+    expect(container.querySelector(".cll-table-level")).toBeNull();
+  });
+
+  it("left-click removes an empty table / unassigns an occupied one", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    layout.applyChange((s) =>
+      setTableStudentAt(createTableAt(s, 1, 1, 2, 2), "1_1", { name: "G" }),
+    );
+
+    container
+      .querySelector(".cll-table")
+      .dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+    expect(layout.getState().tables["1_1"].student).toBeNull();
+
+    container
+      .querySelector(".cll-table")
+      .dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+    expect(layout.getState().tables["1_1"]).toBeUndefined();
   });
 });

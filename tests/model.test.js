@@ -20,6 +20,12 @@ import {
   cellKey,
   hEdgeKey,
   vEdgeKey,
+  createTableAt,
+  removeTableAt,
+  setTableColorAt,
+  setTableStudentAt,
+  tableAtCell,
+  cellOccupied,
 } from "../src/model.js";
 
 describe("toggleDeskAt", () => {
@@ -298,5 +304,82 @@ describe("serialize / deserialize", () => {
     expect(back.grid).toEqual({ cols: 5, rows: 6 });
     expect(back.cells).toEqual({});
     expect(back.edges).toEqual({});
+    expect(back.tables).toEqual({});
+  });
+
+  it("round-trips a table", () => {
+    let state = createTableAt(createEmptyState(), 1, 1, 2, 3);
+    state = setTableStudentAt(state, "1_1", { name: "Groupe A", level: "CE1" });
+    const back = deserializeState(serializeState(state));
+    expect(back).toEqual(state);
+    expect(back.tables["1_1"]).toMatchObject({ w: 2, h: 3, shape: "oval" });
+  });
+});
+
+describe("tables", () => {
+  it("createTableAt: shape is round when w === h, oval otherwise", () => {
+    // Placed at (1,1) so the footprint doesn't touch an edge (no grow/reindex).
+    const shapeOf = (w, h) =>
+      createTableAt(createEmptyState(), 1, 1, w, h).tables["1_1"].shape;
+    expect(shapeOf(2, 2)).toBe("round");
+    expect(shapeOf(1, 2)).toBe("oval");
+    expect(shapeOf(3, 2)).toBe("oval");
+  });
+
+  it("createTableAt: no-op if the footprint falls outside the grid", () => {
+    const s0 = createEmptyState({ cols: 3, rows: 3 });
+    const s1 = createTableAt(s0, 2, 2, 2, 2); // would reach col/row 3
+    expect(s1).toBe(s0);
+  });
+
+  it("createTableAt: no-op if the footprint overlaps a desk or another table", () => {
+    let s = toggleDeskAt(createEmptyState(), 2, 2);
+    expect(createTableAt(s, 1, 1, 2, 2)).toBe(s); // covers (2,2) desk
+
+    s = createTableAt(createEmptyState(), 1, 1, 2, 2);
+    expect(createTableAt(s, 2, 2, 2, 2)).toBe(s); // overlaps the first table
+  });
+
+  it("createTableAt: grows the grid when the table touches the outer edge", () => {
+    // 2x2 at (0,0) touches top + left only -> +1 row, +1 col (5x6 -> 6x7).
+    const s = createTableAt(createEmptyState(), 0, 0, 2, 2);
+    expect(s.grid).toEqual({ cols: 6, rows: 7 });
+    // reindexed one ring in from the new top-left
+    expect(s.tables["1_1"]).toBeDefined();
+    expect(s.tables["0_0"]).toBeUndefined();
+  });
+
+  it("removeTableAt / setTableColorAt / setTableStudentAt", () => {
+    let s = createTableAt(createEmptyState(), 2, 2, 2, 2);
+    s = setTableColorAt(s, "2_2", "#e07a5f");
+    expect(s.tables["2_2"].color).toBe("#e07a5f");
+    expect(s.recentColors).toContain("#e07a5f");
+
+    s = setTableStudentAt(s, "2_2", { id: "7", firstName: "Ada" });
+    expect(s.tables["2_2"].student).toEqual({ id: "7", firstName: "Ada" });
+    s = setTableStudentAt(s, "2_2", null);
+    expect(s.tables["2_2"].student).toBeNull();
+
+    s = removeTableAt(s, "2_2");
+    expect(s.tables["2_2"]).toBeUndefined();
+  });
+
+  it("tableAtCell / cellOccupied cover the whole footprint", () => {
+    const s = createTableAt(createEmptyState(), 1, 1, 2, 3); // rows 1..3, cols 1..2
+    expect(tableAtCell(s, 3, 2)?.key).toBe("1_1");
+    expect(tableAtCell(s, 0, 1)).toBeNull();
+    expect(cellOccupied(s, 2, 2)).toBe(true);
+    expect(cellOccupied(s, 4, 4)).toBe(false);
+  });
+
+  it("fitGridToContentWithRing includes tables and reindexes their key", () => {
+    let s = createEmptyState({ cols: 10, rows: 10 });
+    s.tables = {
+      "6_7": { w: 2, h: 2, shape: "round", color: null, student: null },
+    };
+    const fit = fitGridToContentWithRing(s, s.grid, 0);
+    // bbox = (6,7)..(7,8), ring 0 -> 2x2 grid, table reanchored at (0,0)
+    expect(fit.grid).toEqual({ cols: 2, rows: 2 });
+    expect(fit.tables["0_0"]).toBeDefined();
   });
 });
