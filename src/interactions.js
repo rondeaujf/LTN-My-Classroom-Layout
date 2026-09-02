@@ -24,16 +24,17 @@ import { openContextMenu } from "./menu.js";
 import { openColorPicker } from "./colorPicker.js";
 import { openStudentPicker } from "./studentPicker.js";
 import { openBorderPicker } from "./borderPicker.js";
+import { makeT } from "./i18n.js";
 
 // Stable id for the "teacher" entry synthesized from `options.teacher` (see
 // teacherStudentEntry below). Never collides with a real roster id.
 const TEACHER_STUDENT_ID = "__teacher__";
 
-const HALF_SHIFT_LABELS = {
-  up: "Décaler vers le haut",
-  down: "Décaler vers le bas",
-  left: "Décaler vers la gauche",
-  right: "Décaler vers la droite",
+const HALF_SHIFT_KEYS = {
+  up: "shiftUp",
+  down: "shiftDown",
+  left: "shiftLeft",
+  right: "shiftRight",
 };
 const HALF_SHIFT_ICONS = {
   up: "arrowUp",
@@ -92,6 +93,7 @@ function openAssignPopup(x, y, row, col, ctx) {
       ctx.applyChange((s) => assignStudentAt(s, row, col, student)),
     onUnassign: () => ctx.applyChange((s) => unassignStudentAt(s, row, col)),
     anchorEl: ctx.hostEl,
+    t: ctx.t,
   });
 }
 
@@ -108,6 +110,7 @@ function openColorPopup(x, y, row, col, ctx) {
     onPick: (color) =>
       ctx.applyChange((s) => setDeskColorAt(s, row, col, color)),
     anchorEl: ctx.hostEl,
+    t: ctx.t,
   });
 }
 
@@ -118,7 +121,7 @@ function openCellContextMenu(x, y, row, col, ctx) {
 
   if (!cell) {
     items.push({
-      label: "Ajouter un bureau",
+      label: ctx.t("deskAdd"),
       icon: "plus",
       onSelect: () => ctx.applyChange((s) => toggleDeskAt(s, row, col)),
     });
@@ -126,53 +129,52 @@ function openCellContextMenu(x, y, row, col, ctx) {
     // pas de glissé = bureau, cf. attachInteractions). Plus grande : glisser
     // un rectangle.
     items.push({
-      label: "Créer une table ronde",
+      label: ctx.t("tableCreateRound"),
       icon: "plus",
       onSelect: () => ctx.applyChange((s) => createTableAt(s, row, col, 1, 1)),
     });
   } else {
     items.push({
-      label: cell.student ? "Changer l'élève…" : "Affecter un élève…",
+      label: cell.student ? ctx.t("studentChange") : ctx.t("studentAssign"),
       icon: "personPlus",
       onSelect: () => openAssignPopup(x, y, row, col, ctx),
     });
     if (cell.student) {
       items.push({
-        label: "Retirer l'élève",
+        label: ctx.t("studentRemove"),
         icon: "trash",
         onSelect: () => ctx.applyChange((s) => unassignStudentAt(s, row, col)),
       });
     }
     items.push({ separator: true });
     items.push({
-      label: "Faire pivoter (90°)",
+      label: ctx.t("deskRotate"),
       icon: "rotate",
       onSelect: () => ctx.applyChange((s) => rotateDeskAt(s, row, col)),
     });
     items.push({
-      label: cell.stuck ? "Détacher du bord" : "Coller au bord",
+      label: cell.stuck ? ctx.t("deskUnstick") : ctx.t("deskStick"),
       icon: "dock",
       onSelect: () => ctx.applyChange((s) => toggleDeskStuckAt(s, row, col)),
     });
     for (const direction of HALF_SHIFT_DIRECTIONS) {
       const active = cell.halfShift === direction;
+      const label = ctx.t(HALF_SHIFT_KEYS[direction]);
       items.push({
-        label: active
-          ? `${HALF_SHIFT_LABELS[direction]} ✓`
-          : HALF_SHIFT_LABELS[direction],
+        label: active ? `${label} ✓` : label,
         icon: HALF_SHIFT_ICONS[direction],
         onSelect: () =>
           ctx.applyChange((s) => setDeskHalfShiftAt(s, row, col, direction)),
       });
     }
     items.push({
-      label: "Couleur…",
+      label: ctx.t("colorMenu"),
       icon: "palette",
       onSelect: () => openColorPopup(x, y, row, col, ctx),
     });
     items.push({ separator: true });
     items.push({
-      label: "Supprimer le bureau",
+      label: ctx.t("deskDelete"),
       icon: "trash",
       onSelect: () => ctx.applyChange((s) => removeDeskAt(s, row, col)),
     });
@@ -190,6 +192,7 @@ function handleEdgeClick(x, y, edgeKey, ctx) {
   openBorderPicker(x, y, {
     onPick: (type) => ctx.applyChange((s) => setBorderAt(s, edgeKey, type)),
     anchorEl: ctx.hostEl,
+    t: ctx.t,
   });
 }
 
@@ -201,6 +204,7 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
     openBorderPicker(x, y, {
       onPick: (type) => ctx.applyChange((s) => setBorderAt(s, edgeKey, type)),
       anchorEl: ctx.hostEl,
+      t: ctx.t,
     });
     return;
   }
@@ -209,24 +213,24 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
   // fenetre's icon is symmetric either way; mur has no orientation at all.
   if (edge.type === "porte") {
     items.push({
-      label: "Changer le sens d'ouverture",
+      label: ctx.t("doorChangeOpening"),
       icon: "rotate",
       onSelect: () => ctx.applyChange((s) => rotateBorderAt(s, edgeKey)),
     });
     items.push({
-      label: "Retourner la porte",
+      label: ctx.t("doorFlip"),
       icon: "rotate",
       onSelect: () => ctx.applyChange((s) => flipBorderAt(s, edgeKey)),
     });
   } else if (edge.type === "tableau") {
     items.push({
-      label: "Retourner le tableau",
+      label: ctx.t("boardFlip"),
       icon: "rotate",
       onSelect: () => ctx.applyChange((s) => flipBorderAt(s, edgeKey)),
     });
   }
   items.push({
-    label: "Supprimer",
+    label: ctx.t("deleteGeneric"),
     icon: "trash",
     onSelect: () => ctx.applyChange((s) => clearBorderAt(s, edgeKey)),
   });
@@ -239,13 +243,14 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
 // (annulé par un clic à l'extérieur, cf. popup.js). Forme déduite du
 // rectangle (carré -> ronde, sinon ovale).
 function openTablePrompt(x, y, row, col, w, h, ctx) {
-  const shape = w === h ? "ronde" : "ovale";
   openContextMenu(
     x,
     y,
     [
       {
-        label: `Créer une table ${shape} (${w}×${h})`,
+        label: ctx.t(w === h ? "tablePromptRound" : "tablePromptOval", {
+          size: `${w}×${h}`,
+        }),
         icon: "plus",
         onSelect: () =>
           ctx.applyChange((s) => createTableAt(s, row, col, w, h)),
@@ -267,7 +272,7 @@ function openTableContextMenu(x, y, key, ctx) {
 
   const items = [
     {
-      label: table.student ? "Changer l'élève…" : "Affecter un élève…",
+      label: table.student ? ctx.t("studentChange") : ctx.t("studentAssign"),
       icon: "personPlus",
       onSelect: () =>
         openStudentPicker(x, y, {
@@ -279,19 +284,20 @@ function openTableContextMenu(x, y, key, ctx) {
           onUnassign: () =>
             ctx.applyChange((s) => setTableStudentAt(s, key, null)),
           anchorEl: ctx.hostEl,
+          t: ctx.t,
         }),
     },
   ];
   if (table.student) {
     items.push({
-      label: "Retirer l'élève",
+      label: ctx.t("studentRemove"),
       icon: "trash",
       onSelect: () => ctx.applyChange((s) => setTableStudentAt(s, key, null)),
     });
   }
   items.push({ separator: true });
   items.push({
-    label: "Couleur…",
+    label: ctx.t("colorMenu"),
     icon: "palette",
     onSelect: () =>
       openColorPicker(x, y, {
@@ -303,11 +309,12 @@ function openTableContextMenu(x, y, key, ctx) {
         onPick: (color) =>
           ctx.applyChange((s) => setTableColorAt(s, key, color)),
         anchorEl: ctx.hostEl,
+        t: ctx.t,
       }),
   });
   items.push({ separator: true });
   items.push({
-    label: "Supprimer la table",
+    label: ctx.t("tableDelete"),
     icon: "trash",
     onSelect: () => ctx.applyChange((s) => removeTableAt(s, key)),
   });
@@ -322,6 +329,10 @@ function openTableContextMenu(x, y, key, ctx) {
  * document.body — supplied by the ClassroomLayout instance (src/index.js).
  */
 export function attachInteractions(gridEl, ctx) {
+  // Traducteur des libellés (menus contextuels, sélecteurs) selon
+  // options.locale (défaut « fr »). Posé sur ctx pour toutes les fonctions
+  // de ce module qui le reçoivent.
+  if (!ctx.t) ctx.t = makeT(ctx.options.locale);
   // false : bords (mur/tableau/porte/fenêtre) verrouillés. La classe
   // .cll-root--borders-locked coupe déjà pointer-events sur les .cll-edge
   // (cf. style.css) — ce garde-fou couvre le cas où l'hôte gère le CSS

@@ -1,10 +1,11 @@
 import { openFloating } from "./popup.js";
 import { toHex6, toAlphaPercent, composeColor } from "./colorUtils.js";
+import { makeT } from "./i18n.js";
 
 export function openColorPicker(
   x,
   y,
-  { preferred = [], current, onPick, anchorEl },
+  { preferred = [], current, onPick, anchorEl, t = makeT() },
 ) {
   return openFloating(
     x,
@@ -44,12 +45,12 @@ export function openColorPicker(
       alphaInput.max = "100";
       alphaInput.value = String(toAlphaPercent(current));
       alphaInput.className = "cll-color-alpha";
-      alphaInput.title = "Opacité";
+      alphaInput.title = t("colorOpacity");
 
       const applyBtn = document.createElement("button");
       applyBtn.type = "button";
       applyBtn.className = "cll-color-apply";
-      applyBtn.textContent = "Appliquer";
+      applyBtn.textContent = t("colorApply");
       applyBtn.addEventListener("click", () => {
         close();
         onPick(composeColor(hexInput.value, alphaInput.value));
@@ -61,7 +62,7 @@ export function openColorPicker(
       const resetBtn = document.createElement("button");
       resetBtn.type = "button";
       resetBtn.className = "cll-color-reset";
-      resetBtn.textContent = "Aucune couleur";
+      resetBtn.textContent = t("colorNone");
       resetBtn.addEventListener("click", () => {
         close();
         onPick(null);

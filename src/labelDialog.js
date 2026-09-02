@@ -6,6 +6,7 @@
 // anchored floating panels (openFloating, popup.js): a real form with
 // several fields reads better as a centered dialog.
 import { resolveHost } from "./popup.js";
+import { makeT } from "./i18n.js";
 
 function field(labelText, { type = "text", autofocus = false } = {}) {
   const wrap = document.createElement("label");
@@ -19,7 +20,7 @@ function field(labelText, { type = "text", autofocus = false } = {}) {
   return { wrap, input };
 }
 
-export function openLabelDialog({ onSubmit, anchorEl } = {}) {
+export function openLabelDialog({ onSubmit, anchorEl, t = makeT() } = {}) {
   const host = resolveHost(anchorEl);
 
   const backdrop = document.createElement("div");
@@ -32,7 +33,7 @@ export function openLabelDialog({ onSubmit, anchorEl } = {}) {
   header.className = "cll-dialog__header";
   const title = document.createElement("span");
   title.className = "cll-dialog__title";
-  title.textContent = "Ajouter un label";
+  title.textContent = t("labelTitle");
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "cll-dialog__close";
@@ -41,9 +42,9 @@ export function openLabelDialog({ onSubmit, anchorEl } = {}) {
 
   const body = document.createElement("div");
   body.className = "cll-dialog__body";
-  const firstName = field("Prénom", { autofocus: true });
-  const lastName = field("Nom");
-  const level = field("Étiquette");
+  const firstName = field(t("labelFirstName"), { autofocus: true });
+  const lastName = field(t("labelLastName"));
+  const level = field(t("labelLevel"));
   body.append(firstName.wrap, lastName.wrap, level.wrap);
 
   const footer = document.createElement("div");
@@ -51,11 +52,11 @@ export function openLabelDialog({ onSubmit, anchorEl } = {}) {
   const cancelBtn = document.createElement("button");
   cancelBtn.type = "button";
   cancelBtn.className = "cll-dialog__btn";
-  cancelBtn.textContent = "Annuler";
+  cancelBtn.textContent = t("cancel");
   const submitBtn = document.createElement("button");
   submitBtn.type = "submit";
   submitBtn.className = "cll-dialog__btn cll-dialog__btn--primary";
-  submitBtn.textContent = "Ajouter";
+  submitBtn.textContent = t("add");
   footer.append(cancelBtn, submitBtn);
 
   dialog.append(header, body, footer);

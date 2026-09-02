@@ -1,6 +1,7 @@
 import { openFloating } from "./popup.js";
 import { openLabelDialog } from "./labelDialog.js";
 import { buildMenuIcon } from "./svg.js";
+import { makeT } from "./i18n.js";
 
 function studentLabel(s) {
   if (s.name) return s.name;
@@ -17,6 +18,7 @@ export function openStudentPicker(
     onAssign,
     onUnassign,
     anchorEl,
+    t = makeT(),
   },
 ) {
   return openFloating(
@@ -29,7 +31,7 @@ export function openStudentPicker(
         removeBtn.type = "button";
         removeBtn.className = "cll-student-remove";
         removeBtn.appendChild(buildMenuIcon("trash"));
-        removeBtn.appendChild(document.createTextNode("Retirer l'élève"));
+        removeBtn.appendChild(document.createTextNode(t("studentRemove")));
         removeBtn.addEventListener("click", () => {
           close();
           onUnassign();
@@ -52,7 +54,7 @@ export function openStudentPicker(
         const search = document.createElement("input");
         search.type = "search";
         search.className = "cll-student-search";
-        search.placeholder = "Rechercher un élève…";
+        search.placeholder = t("studentSearch");
 
         const list = document.createElement("ul");
         list.className = "cll-student-list";
@@ -65,7 +67,7 @@ export function openStudentPicker(
             )
             .forEach((s) => {
               const li = document.createElement("li");
-              const suffix = s.isTeacher ? "Enseignant" : s.level;
+              const suffix = s.isTeacher ? t("teacher") : s.level;
               li.textContent = suffix
                 ? `${studentLabel(s)} — ${suffix}`
                 : studentLabel(s);
@@ -99,12 +101,13 @@ export function openStudentPicker(
       addLabelBtn.type = "button";
       addLabelBtn.className = "cll-student-add-label";
       addLabelBtn.appendChild(buildMenuIcon("plus"));
-      addLabelBtn.appendChild(document.createTextNode("Ajouter un label"));
+      addLabelBtn.appendChild(document.createTextNode(t("labelTitle")));
       addLabelBtn.addEventListener("click", () => {
         close();
         openLabelDialog({
           onSubmit: (student) => onAssign(student),
           anchorEl,
+          t,
         });
       });
       panel.appendChild(addLabelBtn);

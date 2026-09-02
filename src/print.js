@@ -1,5 +1,6 @@
 import { renderGrid, finalizeLayout } from "./render.js";
 import { fitGridToContentWithRing } from "./model.js";
+import { makeT } from "./i18n.js";
 
 function teacherName(teacher) {
   if (!teacher) return "";
@@ -41,8 +42,10 @@ export function buildPrintSheet(
     printOrientation,
     printPaper,
     chrome = true,
+    locale,
   } = {},
 ) {
+  const t = makeT(locale);
   // The editing grid can be much bigger than its actual content — every
   // border/desk placed flush against its own current edge grows a fresh
   // free ring to keep the room extensible (growGridToKeepFreeRing,
@@ -74,14 +77,14 @@ export function buildPrintSheet(
       Object.assign(document.createElement("span"), {
         className: "cll-print-school",
         textContent:
-          school || (editableTeacherInputs ? "École : _______________" : ""),
+          school || (editableTeacherInputs ? t("printSchoolBlank") : ""),
       }),
     );
     row.appendChild(
       Object.assign(document.createElement("span"), {
         className: "cll-print-teacher",
         textContent:
-          name || (editableTeacherInputs ? "Enseignant : _______________" : ""),
+          name || (editableTeacherInputs ? t("printTeacherBlank") : ""),
       }),
     );
     header.appendChild(row);

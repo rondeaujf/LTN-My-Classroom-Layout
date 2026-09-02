@@ -1,6 +1,6 @@
 {
   "name": "ltn-classroom-layout",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Standalone vanilla JS module for an interactive classroom seating chart: desk grid, round/oval tables, rotation/color, student assignment, border objects (wall/board/door/window), wheel zoom, print / PDF export, JSON import/export.",
   "type": "module",
   "main": "src/index.js",

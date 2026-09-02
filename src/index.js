@@ -8,6 +8,7 @@ import {
 import { renderGrid, fitGridToHost } from "./render.js";
 import { attachInteractions } from "./interactions.js";
 import { printLayout } from "./print.js";
+import { makeT, normalizeLocale } from "./i18n.js";
 
 export { buildPrintSheet } from "./print.js";
 export { finalizeLayout } from "./render.js";
@@ -39,6 +40,8 @@ export class ClassroomLayout {
   // Références vers les contrôles du panneau « Paramètres » pour les
   // resynchroniser quand setSettings() est appelé par programmation.
   #settingsControls = {};
+  // Traducteur des libellés de l'UI selon options.locale (défaut « fr »).
+  #t;
 
   /**
    * @param {string|Element} container
@@ -74,7 +77,11 @@ export class ClassroomLayout {
     if (!this.#container) {
       throw new Error("ClassroomLayout: conteneur introuvable");
     }
-    this.#options = options;
+    // Copie (on n'altère pas l'objet de l'appelant) + locale normalisée dès la
+    // construction : attachInteractions et buildPrintSheet la relisent depuis
+    // #options.locale.
+    this.#options = { ...options, locale: normalizeLocale(options.locale) };
+    this.#t = makeT(this.#options.locale);
 
     const nameMax = options.nameFit?.max ?? 12;
     const levelMax = options.levelFit?.max ?? 8;
@@ -139,8 +146,7 @@ export class ClassroomLayout {
     if (this.#toolbar.subtitle) {
       this.#subtitleInput = document.createElement("input");
       this.#subtitleInput.type = "text";
-      this.#subtitleInput.placeholder =
-        "Sous-titre (facultatif, affiché à l'impression)";
+      this.#subtitleInput.placeholder = this.#t("subtitlePlaceholder");
       this.#subtitleInput.addEventListener("change", () => {
         this.applyChange((s) => setSubtitle(s, this.#subtitleInput.value));
       });
@@ -150,7 +156,7 @@ export class ClassroomLayout {
     if (this.#toolbar.print) {
       const printBtn = document.createElement("button");
       printBtn.type = "button";
-      printBtn.textContent = "Imprimer / Export PDF";
+      printBtn.textContent = this.#t("printButton");
       printBtn.addEventListener("click", () => this.print());
       parts.push(printBtn);
     }
@@ -188,6 +194,7 @@ export class ClassroomLayout {
    * Réglages appliqués à chaud, non persistés (cf. #settings).
    */
   #buildSettings() {
+    const t = this.#t;
     const wrap = document.createElement("div");
     wrap.className = "cll-settings";
 
@@ -195,8 +202,9 @@ export class ClassroomLayout {
     toggle.type = "button";
     toggle.className = "cll-settings-toggle";
     toggle.setAttribute("aria-expanded", "false");
-    toggle.innerHTML =
-      'Paramètres <span class="cll-settings-caret" aria-hidden="true">▾</span>';
+    toggle.innerHTML = `${t(
+      "settingsToggle",
+    )} <span class="cll-settings-caret" aria-hidden="true">▾</span>`;
 
     const panel = document.createElement("div");
     panel.className = "cll-settings-panel";
@@ -240,12 +248,12 @@ export class ClassroomLayout {
     // Orientation
     panel.append(
       field(
-        "Orientation",
+        t("orientation"),
         select(
           "orientation",
           [
-            ["portrait", "Portrait"],
-            ["landscape", "Paysage"],
+            ["portrait", t("orientationPortrait")],
+            ["landscape", t("orientationLandscape")],
           ],
           this.#settings.printOrientation,
           (v) => this.#applySetting({ printOrientation: v }),
@@ -256,13 +264,13 @@ export class ClassroomLayout {
     // Type de nom
     panel.append(
       field(
-        "Type de nom",
+        t("nameType"),
         select(
           "nameDisplay",
           [
-            ["full", "Nom complet"],
-            ["firstName", "Prénom"],
-            ["lastName", "Nom"],
+            ["full", t("nameTypeFull")],
+            ["firstName", t("nameTypeFirst")],
+            ["lastName", t("nameTypeLast")],
           ],
           this.#settings.nameDisplay,
           (v) => this.#applySetting({ nameDisplay: v }),
@@ -273,7 +281,7 @@ export class ClassroomLayout {
     // Badges de niveau
     panel.append(
       field(
-        "Badges de niveau",
+        t("levelBadges"),
         checkbox("showLevel", this.#settings.showLevel, (v) =>
           this.#applySetting({ showLevel: v }),
         ),
@@ -283,7 +291,7 @@ export class ClassroomLayout {
     // Bordures modifiables
     panel.append(
       field(
-        "Bordures modifiables",
+        t("editableBorders"),
         checkbox("editableBorders", this.#settings.editableBorders, (v) =>
           this.#applySetting({ editableBorders: v }),
         ),
@@ -309,7 +317,7 @@ export class ClassroomLayout {
         },
       });
     });
-    panel.append(field("Taille du nom (px)", fontInput));
+    panel.append(field(t("nameSize"), fontInput));
 
     // Actions : import / export JSON + deux réinitialisations. Le <select>
     // « Portée » décide ce qu'importent/exportent les deux boutons JSON :
@@ -329,9 +337,9 @@ export class ClassroomLayout {
     const scopeSelect = document.createElement("select");
     scopeSelect.className = "cll-settings-scope";
     for (const [v, text] of [
-      ["both", "Élèves + layout"],
-      ["students", "Élèves"],
-      ["layout", "Layout"],
+      ["both", t("scopeBoth")],
+      ["students", t("scopeStudents")],
+      ["layout", t("scopeLayout")],
     ]) {
       scopeSelect.append(new Option(text, v, v === "both", v === "both"));
     }
@@ -354,12 +362,12 @@ export class ClassroomLayout {
 
     actions.append(
       scopeSelect,
-      actionBtn("Exporter (JSON)", () => this.#downloadJson(scopeSelect.value)),
-      actionBtn("Importer (JSON)", () => fileInput.click()),
-      actionBtn("Désaffecter les élèves", () =>
+      actionBtn(t("exportJson"), () => this.#downloadJson(scopeSelect.value)),
+      actionBtn(t("importJson"), () => fileInput.click()),
+      actionBtn(t("unassignAll"), () =>
         this.applyChange((s) => unassignAllStudents(s)),
       ),
-      actionBtn("Effacer tout", () =>
+      actionBtn(t("clearAll"), () =>
         this.applyChange(() => createEmptyState(this.#options.gridDefault)),
       ),
       fileInput,
@@ -368,7 +376,9 @@ export class ClassroomLayout {
     const actionsRow = document.createElement("div");
     actionsRow.className = "cll-settings-field cll-settings-field--actions";
     actionsRow.append(
-      Object.assign(document.createElement("span"), { textContent: "Actions" }),
+      Object.assign(document.createElement("span"), {
+        textContent: t("actionsLabel"),
+      }),
       actions,
     );
     panel.append(actionsRow);
@@ -632,6 +642,7 @@ export class ClassroomLayout {
       printOrientation: this.#settings.printOrientation,
       printPaper: this.#options.printPaper,
       chrome: this.#options.pdfChrome !== false,
+      locale: this.#options.locale,
     };
     if (this.#options.onPrint) {
       this.#options.onPrint(this.getState(), printOpts);

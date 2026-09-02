@@ -4,6 +4,17 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.4.0
+
+- `options.locale` (`"fr"` default — unchanged behaviour for existing hosts).
+  Localizes every built-in UI string: the toolbar and its "Settings" panel,
+  the desk / border / table context menus, the student and colour pickers,
+  the "add a label" dialog, and the blank school / teacher lines of the
+  print sheet. Bundled locales: `fr`, `en`, `de`, `es`, `it`, `zh`; an
+  unknown locale (or a missing key) falls back to French.
+  `new ClassroomLayout(el, { locale: "en" })`; `buildPrintSheet(state, { locale })`
+  for a host driving its own PDF. No new dependency.
+
 ## 1.3.1
 
 - Docs only: `homepage` now points to the live demo

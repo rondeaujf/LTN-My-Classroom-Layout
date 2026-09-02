@@ -1,15 +1,16 @@
 import { openFloating } from "./popup.js";
 import { buildBorderIcon } from "./svg.js";
 import { BORDER_TYPES } from "./model.js";
+import { makeT } from "./i18n.js";
 
-const LABELS = {
-  tableau: "Tableau",
-  porte: "Porte",
-  fenetre: "Fenêtre",
-  mur: "Mur",
+const LABEL_KEYS = {
+  tableau: "borderTableau",
+  porte: "borderPorte",
+  fenetre: "borderFenetre",
+  mur: "borderMur",
 };
 
-export function openBorderPicker(x, y, { onPick, anchorEl }) {
+export function openBorderPicker(x, y, { onPick, anchorEl, t = makeT() }) {
   return openFloating(
     x,
     y,
@@ -21,7 +22,7 @@ export function openBorderPicker(x, y, { onPick, anchorEl }) {
         btn.className = "cll-borderpicker-btn";
         btn.appendChild(buildBorderIcon(type));
         const span = document.createElement("span");
-        span.textContent = LABELS[type];
+        span.textContent = t(LABEL_KEYS[type]);
         btn.appendChild(span);
         btn.addEventListener("click", () => {
           close();
