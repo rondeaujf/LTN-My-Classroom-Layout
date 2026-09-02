@@ -19,6 +19,22 @@
     "Segoe UI",
     Roboto,
     sans-serif;
+  /* Colonne : la barre d'outils reste figée en haut, seule .cll-grid-host
+     défile/pan quand la molette zoome au-delà de sa boîte. Le module ne place
+     jamais que ces deux enfants ici (cf. #buildDom, src/index.js) ; un hôte
+     donne à .cll-root une vraie hauteur (flex:1 dans une colonne contrainte,
+     ou une hauteur fixe). Avant : sans display sur .cll-root, un hôte qui
+     n'enveloppait pas lui-même le module dans une colonne flex laissait
+     .cll-grid-host grandir à sa hauteur de contenu au zoom, poussant la barre
+     d'outils hors de la zone visible. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Barre d'outils figée : ne rétrécit ni ne défile avec le plan zoomé. */
+.cll-toolbar {
+  flex: 0 0 auto;
 }
 
 /* Centers the grid within whatever box a host app gives this element (e.g.
@@ -30,6 +46,9 @@
    flex/grid ancestor instead of only ever growing to content size. */
 .cll-grid-host {
   display: flex;
+  /* Seul élément qui absorbe la place restante de .cll-root et qui défile
+     (pan) au zoom — la barre d'outils au-dessus reste figée. */
+  flex: 1 1 auto;
   /* `safe` : quand la molette zoome au-delà de la boîte (fitGridToHost *
      zoom, cf. src/render.js), le centrage flex empêcherait sinon de faire
      défiler jusqu'au coin haut/gauche. overflow:auto = pan du plan zoomé
@@ -782,6 +801,15 @@
   font-size: 11px;
   color: #566573;
   margin-top: 2px;
+}
+
+/* La feuille d'impression réutilise la classe .cll-root pour ses variables /
+   sa police, mais n'a qu'un enfant .cll-grid (pas de barre d'outils) : on
+   annule ici la mise en colonne flex de .cll-root, sans effet ici et qui
+   contraindrait l'aspect-ratio de la grille. */
+.cll-print-grid-host {
+  display: block;
+  min-height: auto;
 }
 
 /* The dashed editing grid is a canvas aid, not part of the printed room

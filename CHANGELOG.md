@@ -4,6 +4,15 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.4.1
+
+- Fix: the toolbar (subtitle / "Settings" / print) could scroll out of view
+  when the mouse-wheel zoom grew the grid past its box. `.cll-root` is now a
+  flex column owned by the module — toolbar pinned (`flex: 0 0 auto`), only
+  `.cll-grid-host` scrolls/pans. Hosts that already wrapped the module in
+  their own height-constrained flex column are unaffected; the print sheet
+  (`.cll-print-grid-host`) opts back out to plain block flow.
+
 ## 1.4.0
 
 - `options.locale` (`"fr"` default — unchanged behaviour for existing hosts).
