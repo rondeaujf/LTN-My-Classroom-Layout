@@ -4,6 +4,15 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.4.2
+
+- Fix (follow-up to 1.4.1): the toolbar also grew/shifted **sideways** on
+  wheel zoom. `.cll-root` and `.cll-grid-host` now set `min-width: 0` (not
+  just `min-height: 0`), so a `.cll-grid` sized past its box by
+  `fitGridToHost * zoom` is clipped/panned by `.cll-grid-host` instead of
+  forcing its intrinsic width onto `.cll-root` (flexbox `min-*: auto`). The
+  toolbar keeps `.cll-root`'s stable width.
+
 ## 1.4.1
 
 - Fix: the toolbar (subtitle / "Settings" / print) could scroll out of view

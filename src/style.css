@@ -29,10 +29,18 @@
      d'outils hors de la zone visible. */
   display: flex;
   flex-direction: column;
+  /* min-height ET min-width à 0 : sans ça, une .cll-grid dimensionnée en dur
+     par fitGridToHost * zoom (plus grande que sa boîte) impose sa taille
+     intrinsèque à .cll-grid-host puis à .cll-root (règle flexbox `min-*:
+     auto`), qui débordent alors leur boîte hôte au lieu de laisser
+     .cll-grid-host clipper/scroller — la barre d'outils suivait ce
+     débordement en hauteur ET en largeur. */
   min-height: 0;
+  min-width: 0;
 }
 
-/* Barre d'outils figée : ne rétrécit ni ne défile avec le plan zoomé. */
+/* Barre d'outils figée : ne défile pas et ne change pas de largeur avec le
+   plan zoomé (elle s'étire sur la largeur — stable — de .cll-root). */
 .cll-toolbar {
   flex: 0 0 auto;
 }
@@ -57,6 +65,7 @@
   align-items: safe center;
   overflow: auto;
   min-height: 0;
+  min-width: 0;
 }
 
 .cll-grid {
