@@ -1,6 +1,33 @@
-import { renderGrid, finalizeLayout } from "./render.js";
+import { renderGrid, finalizeLayout, fitGridToHost } from "./render.js";
 import { fitGridToContentWithRing } from "./model.js";
 import { makeT } from "./i18n.js";
+
+// Zone imprimable (px @96dpi) d'une page, marge @page comprise (12 mm / côté,
+// cf. printLayout). Sert à dimensionner la grille pour qu'elle tienne sur UNE
+// page — sinon, sur un grand écran, `.cll-grid { width: 100% }` prend la
+// largeur du viewport et l'`aspect-ratio` fait déborder la hauteur (une grille
+// recadrée sur peu de bureaux = un bureau ≈ une page).
+const PAPER_MM = {
+  a3: [297, 420],
+  a4: [210, 297],
+  a5: [148, 210],
+  b4: [250, 353],
+  b5: [176, 250],
+  letter: [215.9, 279.4],
+  legal: [215.9, 355.6],
+  ledger: [279.4, 431.8],
+};
+const MM_TO_PX = 96 / 25.4;
+const PAGE_MARGIN_MM = 12;
+
+export function printableAreaPx(paper, orientation) {
+  const [w, h] = PAPER_MM[String(paper ?? "a4").toLowerCase()] ?? PAPER_MM.a4;
+  const [pw, ph] = orientation === "landscape" ? [h, w] : [w, h];
+  return [
+    (pw - 2 * PAGE_MARGIN_MM) * MM_TO_PX,
+    (ph - 2 * PAGE_MARGIN_MM) * MM_TO_PX,
+  ];
+}
 
 function teacherName(teacher) {
   if (!teacher) return "";
@@ -171,6 +198,33 @@ export function printLayout(state, options = {}) {
   sheet.style.position = "fixed";
   sheet.style.left = "-99999px";
   sheet.style.display = "block";
+
+  // Dimensionne la grille à la zone imprimable de la page (comme fitGridToHost
+  // le fait pour la vue interactive) : sans ça, hors capture html2canvas, la
+  // grille prend la largeur du viewport et déborde sur plusieurs pages. La
+  // taille en px posée par fitGridToHost sur `.cll-grid` est conservée
+  // (on ne réinitialise que la boîte hôte) et prime sur le `width: 100%` du CSS
+  // au moment du window.print().
+  const [availW, availH] = printableAreaPx(
+    options.printPaper,
+    options.printOrientation,
+  );
+  const gridHost = sheet.querySelector(".cll-print-grid-host");
+  const grid = gridHost?.querySelector(".cll-grid");
+  if (gridHost && grid) {
+    const header = sheet.querySelector(".cll-print-header");
+    const footer = sheet.querySelector(".cll-print-footer");
+    const chromeH =
+      (header ? header.offsetHeight : 0) +
+      (footer ? footer.offsetHeight : 0) +
+      24; // marges internes du bandeau/pied
+    sheet.style.width = `${availW}px`;
+    gridHost.style.height = `${Math.max(80, availH - chromeH)}px`;
+    fitGridToHost(gridHost, grid);
+    gridHost.style.height = "";
+    sheet.style.width = "";
+  }
+
   finalizeLayout(sheet, {
     nameFit: options.nameFit,
     levelFit: options.levelFit,

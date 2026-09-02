@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { buildPrintSheet } from "../src/print.js";
+import { describe, it, expect, vi } from "vitest";
+import { buildPrintSheet, printLayout, printableAreaPx } from "../src/print.js";
 import {
   createEmptyState,
   toggleDeskAt,
@@ -129,5 +129,41 @@ describe("buildPrintSheet", () => {
       teacher: { firstName: "J.", lastName: "Doe", school: "École X" },
     });
     expect(sheet.querySelector(".cll-print-header")).not.toBeNull();
+  });
+});
+
+describe("printableAreaPx", () => {
+  it("A4 portrait ≈ 703 × 1032 px (page − 12 mm de marge / côté)", () => {
+    const [w, h] = printableAreaPx("A4", "portrait");
+    expect(Math.round(w)).toBe(703);
+    expect(Math.round(h)).toBe(1032);
+  });
+
+  it("landscape échange largeur et hauteur", () => {
+    const [w, h] = printableAreaPx("A4", "landscape");
+    const [pw, ph] = printableAreaPx("A4", "portrait");
+    expect(Math.round(w)).toBe(Math.round(ph));
+    expect(Math.round(h)).toBe(Math.round(pw));
+  });
+
+  it("papier inconnu → repli A4", () => {
+    expect(printableAreaPx("wat", "portrait")).toEqual(
+      printableAreaPx("a4", "portrait"),
+    );
+  });
+});
+
+describe("printLayout", () => {
+  it("s'exécute sans erreur et nettoie après window.print()", () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    let state = toggleDeskAt(createEmptyState({ cols: 6, rows: 5 }), 2, 2);
+
+    printLayout(state, { printPaper: "A4", printOrientation: "landscape" });
+
+    expect(printSpy).toHaveBeenCalledOnce();
+    window.dispatchEvent(new Event("afterprint"));
+    expect(document.querySelector(".cll-print-sheet")).toBeNull();
+    expect(document.body.classList.contains("cll-printing")).toBe(false);
+    printSpy.mockRestore();
   });
 });

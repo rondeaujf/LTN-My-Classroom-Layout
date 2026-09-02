@@ -4,6 +4,19 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.4.3
+
+- Fix: `printLayout()` (the built-in browser-print path, no host `onPrint`)
+  produced a grid far bigger than one page on a large screen — a
+  content-cropped plan (few desks → e.g. a 1×1 grid) rendered at
+  `width: 100%` of the viewport, and `aspect-ratio` then overflowed the page
+  height, so one desk ≈ one page. `printLayout()` now sizes the grid to the
+  page's printable area (paper + orientation − `@page` margin) via
+  `fitGridToHost`, exactly like the interactive view does for its host box —
+  the plan always fits one page. Host-driven capture (`options.onPrint` /
+  `buildPrintSheet()` + html2canvas) is unchanged. `printableAreaPx()` is
+  exported.
+
 ## 1.4.2
 
 - Fix (follow-up to 1.4.1): the toolbar also grew/shifted **sideways** on
