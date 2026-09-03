@@ -322,6 +322,12 @@ export class ClassroomLayout {
     // Actions : import / export JSON + deux réinitialisations. Le <select>
     // « Portée » décide ce qu'importent/exportent les deux boutons JSON :
     // élèves seuls, layout seul, ou les deux.
+    //
+    // Import/Désaffecter/Effacer sont irréversibles et persistés aussitôt
+    // (applyChange -> #scheduleSave) : un clic malencontreux écraserait
+    // sinon silencieusement le plan sauvegardé côté hôte. window.confirm()
+    // plutôt qu'un dialog maison : le module reste sans dépendance ni
+    // système de dialog imposé à l'hôte.
     const actions = document.createElement("div");
     actions.className = "cll-settings-actions";
 
@@ -354,7 +360,10 @@ export class ClassroomLayout {
       if (!file) return;
       file
         .text()
-        .then((text) => this.importJson(text, scopeSelect.value))
+        .then((text) => {
+          if (!window.confirm(t("confirmImportJson"))) return;
+          this.importJson(text, scopeSelect.value);
+        })
         .catch((err) =>
           console.error("ClassroomLayout: import JSON invalide", err),
         );
@@ -364,12 +373,14 @@ export class ClassroomLayout {
       scopeSelect,
       actionBtn(t("exportJson"), () => this.#downloadJson(scopeSelect.value)),
       actionBtn(t("importJson"), () => fileInput.click()),
-      actionBtn(t("unassignAll"), () =>
-        this.applyChange((s) => unassignAllStudents(s)),
-      ),
-      actionBtn(t("clearAll"), () =>
-        this.applyChange(() => createEmptyState(this.#options.gridDefault)),
-      ),
+      actionBtn(t("unassignAll"), () => {
+        if (!window.confirm(t("confirmUnassignAll"))) return;
+        this.applyChange((s) => unassignAllStudents(s));
+      }),
+      actionBtn(t("clearAll"), () => {
+        if (!window.confirm(t("confirmClearAll"))) return;
+        this.applyChange(() => createEmptyState(this.#options.gridDefault));
+      }),
       fileInput,
     );
 

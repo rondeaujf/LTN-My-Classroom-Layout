@@ -123,7 +123,11 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
   _Importer (JSON)_ reads back from a file (`exportJsonPayload(scope)` /
   `importJson(input, scope)`); _Désaffecter les élèves_ clears every assigned
   student but keeps the furniture; _Effacer tout_ resets to the default empty
-  grid.
+  grid. These three apply immediately and are persisted (via
+  `options.persistence`, see below) — each asks `window.confirm()` first and
+  no-ops if declined. The underlying API calls (`importJson`,
+  `unassignAllStudents`, `clearLayout`) are unaffected — only the built-in
+  toolbar buttons confirm.
 - **Wheel zoom**: the mouse wheel over the grid zooms it in/out **toward the
   cell under the pointer** (that cell stays put); the grid host is
   `overflow:auto`, so a zoomed-in plan can be panned, and the page / host

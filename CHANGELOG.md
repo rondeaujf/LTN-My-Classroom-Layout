@@ -4,6 +4,19 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.4.4
+
+- Fix: the toolbar's "Paramètres" panel actions **Importer (JSON)**,
+  **Désaffecter les élèves** and **Effacer tout** applied immediately —
+  irreversible, and auto-saved to the host's persistence within ~300ms
+  (`applyChange` → debounced `save`) — with no confirmation. A stray click,
+  or importing the wrong file, silently overwrote the host's saved layout.
+  All three now ask `window.confirm()` first (new i18n keys
+  `confirmImportJson`/`confirmUnassignAll`/`confirmClearAll`, all locales) and
+  no-op if declined. The public API (`importJson`/`unassignAllStudents`/
+  `clearLayout`, used when `options.toolbar` is customized) is unchanged — a
+  host driving its own UI keeps full control over confirmation.
+
 ## 1.4.3
 
 - Fix: `printLayout()` (the built-in browser-print path, no host `onPrint`)

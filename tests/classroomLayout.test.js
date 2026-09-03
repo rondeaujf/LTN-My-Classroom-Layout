@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ClassroomLayout } from "../src/index.js";
 import { createTableAt, setTableStudentAt } from "../src/model.js";
 
@@ -1012,6 +1012,14 @@ describe("import / export + reset (Paramètres panel)", () => {
     document.body.replaceChildren();
     container = document.createElement("div");
     document.body.appendChild(container);
+    // Importer/Désaffecter/Effacer confirment avant d'appliquer (irréversible +
+    // persisté aussitôt, cf. src/index.js) — approuvé par défaut ; les tests
+    // dédiés au refus le re-mockent à `false`.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const actionBtn = (root, label) =>
@@ -1199,6 +1207,68 @@ describe("import / export + reset (Paramètres panel)", () => {
     expect(layout.getState().tables).toEqual({});
     expect(layout.getState().grid).toEqual({ cols: 4, rows: 4 });
     expect(container.querySelectorAll(".cll-cell--desk").length).toBe(0);
+  });
+
+  it("'Désaffecter les élèves' does nothing if the confirmation is declined", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    withDeskAndStudent(layout);
+    window.confirm.mockReturnValueOnce(false);
+
+    click(actionBtn(container, "Désaffecter les élèves"));
+    expect(layout.getState().cells["1_1"].student).toEqual({
+      id: "9",
+      firstName: "Ada",
+    });
+  });
+
+  it("'Effacer tout' does nothing if the confirmation is declined", async () => {
+    const layout = new ClassroomLayout(container, {
+      gridDefault: { cols: 4, rows: 4 },
+    });
+    await layout.ready;
+    withDeskAndStudent(layout);
+    window.confirm.mockReturnValueOnce(false);
+
+    click(actionBtn(container, "Effacer tout"));
+    expect(layout.getState().cells["1_1"]).toBeDefined();
+  });
+
+  it("'Importer (JSON)' applies the file only once the confirmation is accepted", async () => {
+    const layout = new ClassroomLayout(container, {
+      students: [{ id: "0", firstName: "Old" }],
+    });
+    await layout.ready;
+    const payload = {
+      students: [{ id: "1", firstName: "New" }],
+      layout: layout.exportJsonPayload("layout").layout,
+    };
+    const file = new File([JSON.stringify(payload)], "plan.json", {
+      type: "application/json",
+    });
+    const fileInput = container.querySelector('input[type="file"]');
+    const selectFile = async () => {
+      Object.defineProperty(fileInput, "files", {
+        value: [file],
+        configurable: true,
+      });
+      fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      // file.text() resolves asynchronously — flush the microtask queue.
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    window.confirm.mockReturnValueOnce(false);
+    await selectFile();
+    expect(layout.exportJsonPayload("students").students).toEqual([
+      { id: "0", firstName: "Old" },
+    ]);
+
+    window.confirm.mockReturnValueOnce(true);
+    await selectFile();
+    expect(layout.exportJsonPayload("students").students).toEqual([
+      { id: "1", firstName: "New" },
+    ]);
   });
 
   it("'Exporter (JSON)' triggers a download without throwing", async () => {
