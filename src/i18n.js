@@ -52,6 +52,11 @@ const STRINGS = {
     importJson: "Importer (JSON)",
     unassignAll: "Désaffecter les élèves",
     clearAll: "Effacer tout",
+    confirmImportJson:
+      "Remplacer les données actuelles (élèves et/ou disposition) par ce fichier ?",
+    confirmUnassignAll: "Désaffecter tous les élèves de leur bureau ?",
+    confirmClearAll:
+      "Tout effacer (bureaux, tables, bordures et élèves affectés) ?",
     actionsLabel: "Actions",
     borderTableau: "Tableau",
     borderPorte: "Porte",
@@ -113,6 +118,11 @@ const STRINGS = {
     importJson: "Import (JSON)",
     unassignAll: "Unassign students",
     clearAll: "Clear all",
+    confirmImportJson:
+      "Replace the current data (students and/or layout) with this file?",
+    confirmUnassignAll: "Unassign every student from their desk?",
+    confirmClearAll:
+      "Clear everything (desks, tables, borders and assigned students)?",
     actionsLabel: "Actions",
     borderTableau: "Board",
     borderPorte: "Door",
@@ -174,6 +184,11 @@ const STRINGS = {
     importJson: "Importieren (JSON)",
     unassignAll: "Schülerzuordnung aufheben",
     clearAll: "Alles löschen",
+    confirmImportJson:
+      "Aktuelle Daten (Schüler und/oder Layout) durch diese Datei ersetzen?",
+    confirmUnassignAll: "Alle Schüler von ihrem Tisch trennen?",
+    confirmClearAll:
+      "Alles löschen (Tische, Gruppentische, Ränder und zugewiesene Schüler)?",
     actionsLabel: "Aktionen",
     borderTableau: "Tafel",
     borderPorte: "Tür",
@@ -235,6 +250,11 @@ const STRINGS = {
     importJson: "Importar (JSON)",
     unassignAll: "Desasignar los alumnos",
     clearAll: "Borrar todo",
+    confirmImportJson:
+      "¿Reemplazar los datos actuales (alumnos y/o disposición) por este archivo?",
+    confirmUnassignAll: "¿Desasignar a todos los alumnos de su pupitre?",
+    confirmClearAll:
+      "¿Borrar todo (pupitres, mesas, bordes y alumnos asignados)?",
     actionsLabel: "Acciones",
     borderTableau: "Pizarra",
     borderPorte: "Puerta",
@@ -296,6 +316,12 @@ const STRINGS = {
     importJson: "Importa (JSON)",
     unassignAll: "Rimuovi assegnazioni alunni",
     clearAll: "Cancella tutto",
+    confirmImportJson:
+      "Sostituire i dati attuali (alunni e/o disposizione) con questo file?",
+    confirmUnassignAll:
+      "Rimuovere l'assegnazione di tutti gli alunni dal banco?",
+    confirmClearAll:
+      "Cancellare tutto (banchi, tavoli, bordi e alunni assegnati)?",
     actionsLabel: "Azioni",
     borderTableau: "Lavagna",
     borderPorte: "Porta",
@@ -357,6 +383,9 @@ const STRINGS = {
     importJson: "导入（JSON）",
     unassignAll: "取消分配学生",
     clearAll: "全部清除",
+    confirmImportJson: "用此文件替换当前数据（学生和/或布局）？",
+    confirmUnassignAll: "取消所有学生的座位分配？",
+    confirmClearAll: "清除所有内容（课桌、桌子、边界和已分配的学生）？",
     actionsLabel: "操作",
     borderTableau: "黑板",
     borderPorte: "门",
