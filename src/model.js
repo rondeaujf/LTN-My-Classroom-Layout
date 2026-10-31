@@ -184,7 +184,7 @@ export function cellOccupied(state, row, col) {
  * (row,col). No-op if the block falls outside the grid or any of its cells
  * already holds a desk or another table.
  */
-export function createTableAt(state, row, col, w, h) {
+export function createTableAt(state, row, col, w, h, rectangular = false) {
   if (w < 1 || h < 1) return state;
   const { rows, cols } = state.grid;
   if (row < 0 || col < 0 || row + h > rows || col + w > cols) return state;
@@ -201,7 +201,7 @@ export function createTableAt(state, row, col, w, h) {
         [key]: {
           w,
           h,
-          shape: w === h ? "round" : "oval",
+          shape: rectangular ? "rect" : w === h ? "round" : "oval",
           color: null,
           student: null,
         },
@@ -264,14 +264,14 @@ export function unassignAllStudents(state) {
   return changed ? touch({ ...state, cells, tables }) : state;
 }
 
-export function toggleDeskAt(state, row, col) {
+export function toggleDeskAt(state, row, col, rotation = 0) {
   const key = cellKey(row, col);
   const cell = state.cells[key];
   const cells = { ...state.cells };
   if (!cell) {
     cells[key] = {
       type: "desk",
-      rotation: 0,
+      rotation,
       color: null,
       student: null,
       stuck: false,

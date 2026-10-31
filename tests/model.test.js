@@ -325,6 +325,9 @@ describe("tables", () => {
     expect(shapeOf(2, 2)).toBe("round");
     expect(shapeOf(1, 2)).toBe("oval");
     expect(shapeOf(3, 2)).toBe("oval");
+    expect(
+      createTableAt(createEmptyState(), 1, 1, 3, 2, true).tables["1_1"].shape,
+    ).toBe("rect");
   });
 
   it("createTableAt: no-op if the footprint falls outside the grid", () => {
