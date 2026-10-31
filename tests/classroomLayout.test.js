@@ -895,7 +895,10 @@ describe("round / oval tables", () => {
     mouse(b, "mousemove");
     mouse(b, "mouseup");
 
-    expect(menuItems()).toEqual(["Créer une table ovale (2×1)"]);
+    expect(menuItems()).toEqual([
+      "Créer une table ovale (2×1)",
+      "Créer une table rectangulaire (2×1)",
+    ]);
     document.querySelector(".cll-menu-item").click();
 
     expect(layout.getState().tables["2_2"]).toMatchObject({
@@ -904,6 +907,48 @@ describe("round / oval tables", () => {
       shape: "oval",
     });
     expect(container.querySelector(".cll-table")).not.toBeNull();
+  });
+
+  it("drag then 'rectangulaire' creates a rect table", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    const a = container.querySelector('[data-row="2"][data-col="2"]');
+    const b = container.querySelector('[data-row="3"][data-col="3"]');
+    mouse(a, "mousedown");
+    mouse(b, "mousemove");
+    mouse(b, "mouseup");
+    document.querySelectorAll(".cll-menu-item")[1].click();
+    expect(layout.getState().tables["2_2"]).toMatchObject({
+      w: 2,
+      h: 2,
+      shape: "rect",
+    });
+    expect(container.querySelector(".cll-table--rect")).not.toBeNull();
+  });
+
+  it("a new desk takes the orientation of the last desk rotated", async () => {
+    const layout = new ClassroomLayout(container);
+    await layout.ready;
+    container
+      .querySelector('[data-row="1"][data-col="1"]')
+      .dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+    container
+      .querySelector('[data-row="1"][data-col="1"]')
+      .dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true }),
+      );
+    Array.from(document.querySelectorAll(".cll-menu-item"))
+      .find((li) => li.textContent === "Faire pivoter (90°)")
+      .click();
+    expect(layout.getState().cells["1_1"].rotation).toBe(90);
+
+    const cell = container.querySelector('[data-row="3"][data-col="3"]');
+    cell.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    expect(layout.getState().cells["3_3"].rotation).toBe(90);
   });
 
   it("a plain click (no drag) still makes a desk, not a table", async () => {

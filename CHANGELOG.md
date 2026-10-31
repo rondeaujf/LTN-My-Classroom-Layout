@@ -4,6 +4,17 @@ All notable changes to `ltn-classroom-layout`. Versions ≤ 1.2.0 were consumed
 via a GitHub tag (`github:rondeaujf/LTN-My-Classroom-Layout#vX.Y.Z`); 1.2.1 is
 the first release on the npm registry.
 
+## 1.5.0
+
+- **Rectangular tables**: after click-dragging a rectangle of empty cells, the
+  confirm menu now offers a second entry, "Créer une table rectangulaire"
+  (new i18n key `tablePromptRect`, all locales), next to round/oval.
+  `createTableAt(state, row, col, w, h, rectangular = false)`; such tables
+  have `shape: "rect"` (CSS class `cll-table--rect`).
+- A new desk is created with the orientation of the last desk created or
+  rotated in the session (not persisted). `toggleDeskAt` gains an optional
+  `rotation` argument (default 0).
+
 ## 1.4.4
 
 - Fix: the toolbar's "Paramètres" panel actions **Importer (JSON)**,

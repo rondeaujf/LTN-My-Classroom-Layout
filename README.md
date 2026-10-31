@@ -94,7 +94,7 @@ static server, e.g. `npx serve .` — ES modules don't load from `file://`).
 - **Round / oval tables**: right-click an empty cell → "Créer une table
   ronde" for a 1-cell table; **click-drag a rectangle** of empty cells (then
   confirm in the small menu that pops up) for a bigger one — square
-  footprint → round, elongated → oval. A table carries one label + one level
+  footprint → round, elongated → oval, or pick "rectangular" in the menu. A table carries one label + one level
   badge, exactly like a desk (right-click it to assign a student, set a
   color, or delete it; left-click removes the student, then the table). A
   plain click without dragging still just adds a desk. `state.tables`, keyed
@@ -288,7 +288,7 @@ internally.
     "2_3": {
       "w": 2,
       "h": 3,
-      "shape": "oval", // "round" when w === h, else "oval"
+      "shape": "oval", // "round" when w === h, else "oval"; "rect" if chosen
       "color": "#81b29a", // or null
       "student": { "id": "1", "name": "Groupe A", "level": "CE1" }, // or null
     },

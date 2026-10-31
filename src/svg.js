@@ -82,15 +82,44 @@ export function buildTableSvg({ occupied, shape }) {
   const svg = el("svg", {
     viewBox: "0 0 100 100",
     preserveAspectRatio: "none",
-    class: `cll-table-svg cll-table-svg--${shape === "round" ? "round" : "oval"}`,
+    class: `cll-table-svg cll-table-svg--${shape === "round" || shape === "rect" ? shape : "oval"}`,
     "aria-hidden": "true",
   });
-  svg.appendChild(
-    el("ellipse", { cx: 50, cy: 50, rx: 47, ry: 47, class: "cll-table-top" }),
-  );
-  svg.appendChild(
-    el("ellipse", { cx: 50, cy: 50, rx: 41, ry: 41, class: "cll-table-inner" }),
-  );
+  if (shape === "rect") {
+    svg.appendChild(
+      el("rect", {
+        x: 3,
+        y: 3,
+        width: 94,
+        height: 94,
+        rx: 3,
+        class: "cll-table-top",
+      }),
+    );
+    svg.appendChild(
+      el("rect", {
+        x: 9,
+        y: 9,
+        width: 82,
+        height: 82,
+        rx: 2,
+        class: "cll-table-inner",
+      }),
+    );
+  } else {
+    svg.appendChild(
+      el("ellipse", { cx: 50, cy: 50, rx: 47, ry: 47, class: "cll-table-top" }),
+    );
+    svg.appendChild(
+      el("ellipse", {
+        cx: 50,
+        cy: 50,
+        rx: 41,
+        ry: 41,
+        class: "cll-table-inner",
+      }),
+    );
+  }
   if (occupied) {
     svg.appendChild(
       el("ellipse", { cx: 50, cy: 56, rx: 13, ry: 9, class: "cll-figure" }),

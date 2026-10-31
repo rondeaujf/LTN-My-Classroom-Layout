@@ -74,8 +74,21 @@ function teacherStudentEntry(teacher) {
   };
 }
 
+// Un nouveau bureau reprend l'orientation du dernier bureau posé ou tourné
+// (ctx.session, propre à l'instance : session seulement, non persisté).
+function addDeskAt(row, col, ctx) {
+  const rotation = ctx.session?.deskRotation ?? 0;
+  ctx.applyChange((s) => toggleDeskAt(s, row, col, rotation));
+}
+
 function handleCellClick(row, col, ctx) {
-  ctx.applyChange((state) => toggleDeskAt(state, row, col));
+  addDeskAt(row, col, ctx);
+}
+
+function rotateDesk(row, col, ctx) {
+  ctx.applyChange((s) => rotateDeskAt(s, row, col));
+  const cell = ctx.getState().cells[cellKey(row, col)];
+  if (cell && ctx.session) ctx.session.deskRotation = cell.rotation;
 }
 
 function openAssignPopup(x, y, row, col, ctx) {
@@ -123,7 +136,7 @@ function openCellContextMenu(x, y, row, col, ctx) {
     items.push({
       label: ctx.t("deskAdd"),
       icon: "plus",
-      onSelect: () => ctx.applyChange((s) => toggleDeskAt(s, row, col)),
+      onSelect: () => addDeskAt(row, col, ctx),
     });
     // Table 1 case : le seul chemin (un cliquer-glisser d'une seule cellule =
     // pas de glissé = bureau, cf. attachInteractions). Plus grande : glisser
@@ -150,7 +163,7 @@ function openCellContextMenu(x, y, row, col, ctx) {
     items.push({
       label: ctx.t("deskRotate"),
       icon: "rotate",
-      onSelect: () => ctx.applyChange((s) => rotateDeskAt(s, row, col)),
+      onSelect: () => rotateDesk(row, col, ctx),
     });
     items.push({
       label: cell.stuck ? ctx.t("deskUnstick") : ctx.t("deskStick"),
@@ -239,21 +252,28 @@ function openEdgeContextMenu(x, y, edgeKey, ctx) {
 
 // --- Tables --------------------------------------------------------------
 
-// Confirmation minimale après un cliquer-glisser : un menu à une entrée
-// (annulé par un clic à l'extérieur, cf. popup.js). Forme déduite du
-// rectangle (carré -> ronde, sinon ovale).
+// Confirmation minimale après un cliquer-glisser : un menu (annulé par un clic
+// à l'extérieur, cf. popup.js). Deux formes : ronde/ovale (carré -> ronde, sinon
+// ovale, déduit du rectangle) ou rectangulaire.
 function openTablePrompt(x, y, row, col, w, h, ctx) {
+  const size = `${w}×${h}`;
   openContextMenu(
     x,
     y,
     [
       {
         label: ctx.t(w === h ? "tablePromptRound" : "tablePromptOval", {
-          size: `${w}×${h}`,
+          size,
         }),
         icon: "plus",
         onSelect: () =>
           ctx.applyChange((s) => createTableAt(s, row, col, w, h)),
+      },
+      {
+        label: ctx.t("tablePromptRect", { size }),
+        icon: "plus",
+        onSelect: () =>
+          ctx.applyChange((s) => createTableAt(s, row, col, w, h, true)),
       },
     ],
     ctx.hostEl,

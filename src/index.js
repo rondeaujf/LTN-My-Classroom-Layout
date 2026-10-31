@@ -32,6 +32,9 @@ export class ClassroomLayout {
   #levelNameRatio;
   // Facteur de zoom molette (survol de la grille). Session uniquement.
   #zoom = 1;
+  // État de session partagé avec les interactions (recréées à chaque rendu) :
+  // orientation du dernier bureau posé/tourné, reprise par le suivant.
+  #session = { deskRotation: 0 };
   #gridWheelHandler;
   // Quelles parties de la barre d'outils intégrée sont affichées
   // (cf. options.toolbar). `false` partout = aucune barre, l'hôte pilote via
@@ -602,6 +605,7 @@ export class ClassroomLayout {
       // #settings passe après #options : editableBorders du panneau prime.
       options: { ...this.#options, ...this.#settings },
       hostEl: this.#root,
+      session: this.#session,
     });
   }
 
